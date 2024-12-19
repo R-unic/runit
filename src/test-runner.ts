@@ -3,6 +3,7 @@ import { Constructor } from "@flamework/core/out/utility";
 import { StringBuilder } from "@rbxts/string-builder";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
 import { flatten, reverse } from "@rbxts/array-utils";
+import { slice } from "@rbxts/string-utils";
 import Object from "@rbxts/object-utils";
 
 import { Maybe, Meta } from "./common";
@@ -17,6 +18,12 @@ function createSymbol<T extends symbol = symbol>(name: string): T {
 	return symbol;
 }
 
+function slugToPascal(slug: string): string {
+	return slug.split("-")
+		.map(word => word.sub(1, 1).upper() + slice(word, 1))
+		.join("");
+}
+
 type TestPassedSymbol = symbol & {
 	readonly __skip?: undefined;
 };
@@ -27,44 +34,43 @@ class TestRunner {
 	private readonly testClasses: [Constructor, object][];
 	private failedTests = 0;
 	private passedTests = 0;
-	private results: Record<string, Record<string, string | TestPassedSymbol>> = {};
+	private results = new Map<Constructor, Record<string, string | TestPassedSymbol>>;
 
-	public constructor(
-		private readonly roots: Instance[],
-		private readonly reporter: (testResults: string) => void = print
-	) {
-		this.testClasses = flatten(this.roots.map(root => getDescendantsOfType(root, "ModuleScript")))
+	public constructor(roots: Instance[]) {
+		this.testClasses = flatten(roots.map(root => getDescendantsOfType(root, "ModuleScript")))
 			.map(module => {
 				const TestClass = <Constructor>require(module);
+				(<any>TestClass).__moduleInstance = module;
+				(<any>TestClass).__isNested = module.Parent !== undefined && !roots.includes(module.Parent);
 				return [TestClass, new TestClass];
 			});
 	}
 
-	public run(): void {
+	public run(reporter: (testResults: string) => void = print): void {
+		this.results = new Map;
+
 		const start = os.clock();
 		for (const [TestClass, testClass] of this.testClasses) {
-			const testClassName = tostring(TestClass);
 			const properties = Reflect.getProperties(TestClass);
 			const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property))
 			const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
 
 			const fail = (exception: unknown, name: string, extra?: string) => {
 				this.failedTests++;
-				if (this.results[testClassName] === undefined)
-					this.results[testClassName] = {};
 
-				// const split = tostring(exception).split(":");
-				// split.shift();
-				// split.shift();
+				let classResults = this.results.get(TestClass);
+				if (classResults === undefined)
+					classResults = this.results.set(TestClass, {}).get(TestClass)!;
 
-				this.results[testClassName][`${name}${extra !== undefined ? " | " + extra : ""}`] = tostring(exception); //split.join(":");
+				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = tostring(exception);
 			}
 			const pass = (name: string, extra?: string) => {
 				this.passedTests++;
-				if (this.results[testClassName] === undefined)
-					this.results[testClassName] = {};
+				let classResults = this.results.get(TestClass);
+				if (classResults === undefined)
+					classResults = this.results.set(TestClass, {}).get(TestClass)!;
 
-				this.results[testClassName][`${name}${extra !== undefined ? " | " + extra : ""}`] = TestPassed;
+				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = TestPassed;
 			}
 
 			for (const factName of factNames) {
@@ -98,7 +104,7 @@ class TestRunner {
 		}
 
 		const elapsedTime = os.clock() - start;
-		this.reporter(this.generateOutput(elapsedTime));
+		reporter(this.generateOutput(elapsedTime));
 	}
 
 	private generateOutput(elapsedTime: number): string {
@@ -107,9 +113,9 @@ class TestRunner {
 
 		const appendIndent = () => results.append("  ".rep(indent));
 
-		for (const [testClassName, testCases] of pairs(this.results)) {
+		for (const [TestClass, testCases] of pairs(this.results)) {
 			const allPassed = Object.values(testCases).every(value => value === TestPassed);
-			results.appendLine(`[${allPassed ? "+" : "x"}] ${testClassName}`);
+			results.appendLine(`[${allPassed ? "+" : "x"}] ${TestClass}`);
 
 			indent++;
 			for (const [testCaseName, message] of reverse(Object.entries(testCases))) {
