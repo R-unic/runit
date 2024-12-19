@@ -117,7 +117,7 @@ class Assert {
     }
   }
 
-  public static isType(value: unknown, expectedType: keyof CheckablePrimitives | ClassType): void {
+  public static isType(value: unknown, expectedType: keyof CheckableTypes | ClassType): void {
     if (typeOf(expectedType) === "string") {
       const actualType = typeOf(value);
       if (actualType === expectedType) return;
