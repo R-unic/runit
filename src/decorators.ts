@@ -15,12 +15,14 @@ export const Theory = Modding.createDecorator<void[]>("Method", descriptor => {
   Reflect.defineMetadata(descriptor.object, Meta.Theory, true, descriptor.property)
 });
 
-export const InlineData = Modding.createDecorator<unknown[]>("Method", (descriptor, args) => {
-  if (Reflect.hasMetadata(descriptor.object, Meta.Fact))
-    throw Errors.InvalidInlineData;
+export function InlineData<T extends object, Args extends unknown[]>(...args: Args) {
+  return (ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args) => void>) => {
+    if (Reflect.hasMetadata(ctor, Meta.Fact))
+      throw Errors.InvalidInlineData;
 
-  const inlineDataMeta = <Maybe<unknown[][]>>Reflect.getMetadata(descriptor.object, Meta.InlineData, descriptor.property) ?? [];
-  inlineDataMeta.push(args);
+    const inlineDataMeta = <Maybe<unknown[][]>>Reflect.getMetadata(ctor, Meta.InlineData, propertyKey) ?? [];
+    inlineDataMeta.push(args);
 
-  Reflect.defineMetadata(descriptor.object, Meta.InlineData, inlineDataMeta, descriptor.property);
-});
+    Reflect.defineMetadata(ctor, Meta.InlineData, inlineDataMeta, propertyKey);
+  }
+}
