@@ -45,4 +45,3 @@ export function DynamicData<T extends object, Args>(generator: () => Iterable<Ar
     Reflect.defineMetadata(ctor, Meta.TestData, dataMeta, propertyKey);
   }
 }
-
