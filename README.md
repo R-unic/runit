@@ -5,7 +5,7 @@ A unit testing library for Roblox heavily inspired by Xunit from C#
 ## Example
 
 src/scripts/run-tests.server.ts
-```
+```ts
 import { TestRunner } from "@rbxts/runit";
 import { ServerScriptService } from "@rbxts/services";
 
