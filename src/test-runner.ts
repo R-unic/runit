@@ -3,7 +3,6 @@ import { Constructor } from "@flamework/core/out/utility";
 import { StringBuilder } from "@rbxts/string-builder";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
 import { flatten, reverse } from "@rbxts/array-utils";
-import { slice } from "@rbxts/string-utils";
 import Object from "@rbxts/object-utils";
 
 import { Maybe, Meta } from "./common";
@@ -18,12 +17,7 @@ function createSymbol<T extends symbol = symbol>(name: string): T {
 	return symbol;
 }
 
-function slugToPascal(slug: string): string {
-	return slug.split("-")
-		.map(word => word.sub(1, 1).upper() + slice(word, 1))
-		.join("");
-}
-
+type TestClassInstance = Record<string, Callback>;
 type TestPassedSymbol = symbol & {
 	readonly __skip?: undefined;
 };
@@ -31,22 +25,24 @@ type TestPassedSymbol = symbol & {
 const TestPassed = createSymbol<TestPassedSymbol>("Runit.TestPassed");
 
 class TestRunner {
-	private readonly testClasses: [Constructor, object][];
+	private readonly testClasses: [Constructor<TestClassInstance>, TestClassInstance][];
 	private failedTests = 0;
 	private passedTests = 0;
 	private results = new Map<Constructor, Record<string, string | TestPassedSymbol>>;
 
-	public constructor(roots: Instance[]) {
+	public constructor(...roots: Instance[]) {
 		this.testClasses = flatten(roots.map(root => getDescendantsOfType(root, "ModuleScript")))
 			.map(module => {
-				const TestClass = <Constructor>require(module);
+				const TestClass = <Constructor<TestClassInstance>>require(module);
 				(<any>TestClass).__moduleInstance = module;
 				(<any>TestClass).__isNested = module.Parent !== undefined && !roots.includes(module.Parent);
 				return [TestClass, new TestClass];
 			});
 	}
 
-	public run(reporter: (testResults: string) => void = print): void {
+	public async run(): Promise<void>
+	public async run(reporter: (testResults: string) => void): Promise<void>
+	public async run(reporter: (testResults: string) => void = print): Promise<void> {
 		this.results = new Map;
 
 		const start = os.clock();
@@ -55,7 +51,7 @@ class TestRunner {
 			const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property))
 			const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
 
-			const fail = (exception: unknown, name: string, extra?: string) => {
+			const fail = (exception: unknown, name: string, extra?: string): void => {
 				this.failedTests++;
 
 				let classResults = this.results.get(TestClass);
@@ -64,7 +60,7 @@ class TestRunner {
 
 				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = tostring(exception);
 			}
-			const pass = (name: string, extra?: string) => {
+			const pass = (name: string, extra?: string): void => {
 				this.passedTests++;
 				let classResults = this.results.get(TestClass);
 				if (classResults === undefined)
@@ -72,33 +68,32 @@ class TestRunner {
 
 				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = TestPassed;
 			}
+			const runTestCase = async (testCase: Callback, name: string, extra?: string): Promise<boolean> => {
+				try {
+					await testCase(testClass);
+				} catch (e) {
+					fail(e, name, extra);
+					return false;
+				}
+
+				pass(name, extra);
+				return true;
+			};
 
 			for (const factName of factNames) {
-				const fact = <Callback>testClass[<never>factName];
-				try {
-					fact();
-				} catch (e) {
-					fail(e, factName);
-					continue;
-				}
-				pass(factName);
+				const fact = testClass[factName];
+				if (!await runTestCase(fact, factName)) continue;
 			}
 
 			for (const theoryName of theoryNames) {
-				const theory = <Callback>testClass[<never>theoryName];
-				const testCases = <Maybe<unknown[][]>>Reflect.getMetadata(TestClass, Meta.InlineData, theoryName);
+				const testCases = <Maybe<unknown[][]>>Reflect.getMetadata(TestClass, Meta.TestData, theoryName);
 				if (testCases === undefined)
 					throw `No data was provided to Theory test "${theoryName}"`;
 
+				const theory = testClass[theoryName];
 				for (const args of reverse(testCases)) {
 					const inputDisplay = `input: (${(<defined[]>args).map(tostring).join(", ")})`;
-					try {
-						theory(testClass, ...args);
-					} catch (e) {
-						fail(e, theoryName, inputDisplay);
-						continue;
-					}
-					pass(theoryName, inputDisplay);
+					if (!await runTestCase(theory, theoryName, inputDisplay)) continue;
 				}
 			}
 		}

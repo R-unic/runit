@@ -2,6 +2,8 @@ import { Modding, Reflect } from "@flamework/core";
 import { Maybe, Errors, Meta } from "./common";
 
 export const Fact = Modding.createDecorator<void[]>("Method", descriptor => {
+  if (Reflect.hasMetadata(descriptor.object, Meta.TestData))
+    throw Errors.UnexpectedData;
   if (Reflect.hasMetadata(descriptor.object, Meta.Theory))
     throw Errors.NotBoth;
 
@@ -9,6 +11,8 @@ export const Fact = Modding.createDecorator<void[]>("Method", descriptor => {
 });
 
 export const Theory = Modding.createDecorator<void[]>("Method", descriptor => {
+  if (Reflect.hasMetadata(descriptor.object, Meta.Theory))
+    throw Errors.NotBoth;
   if (Reflect.hasMetadata(descriptor.object, Meta.Fact))
     throw Errors.NotBoth;
 
@@ -18,11 +22,27 @@ export const Theory = Modding.createDecorator<void[]>("Method", descriptor => {
 export function InlineData<T extends object, Args extends unknown[]>(...args: Args) {
   return (ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args) => void>) => {
     if (Reflect.hasMetadata(ctor, Meta.Fact))
-      throw Errors.InvalidInlineData;
+      throw Errors.UnexpectedData;
 
-    const inlineDataMeta = <Maybe<unknown[][]>>Reflect.getMetadata(ctor, Meta.InlineData, propertyKey) ?? [];
-    inlineDataMeta.push(args);
+    const dataMeta = <Maybe<unknown[][]>>Reflect.getMetadata(ctor, Meta.TestData, propertyKey) ?? [];
+    dataMeta.push(args);
 
-    Reflect.defineMetadata(ctor, Meta.InlineData, inlineDataMeta, propertyKey);
+    Reflect.defineMetadata(ctor, Meta.TestData, dataMeta, propertyKey);
   }
 }
+
+export function DynamicData<T extends object, Args>(generator: () => Iterable<Args>) {
+  return (ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args[]) => void>) => {
+    if (Reflect.hasMetadata(ctor, Meta.Fact))
+      throw Errors.UnexpectedData;
+
+    const dataMeta = <Maybe<unknown[][]>>Reflect.getMetadata(ctor, Meta.TestData, propertyKey) ?? [];
+    const nextData = generator()[Symbol.iterator]();
+    let data = <void | Args><unknown>[];
+    while (data !== undefined)
+      data = nextData.next().value;
+
+    Reflect.defineMetadata(ctor, Meta.TestData, dataMeta, propertyKey);
+  }
+}
+
