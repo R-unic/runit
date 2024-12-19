@@ -1,0 +1,48 @@
+{
+  "name": "@rbxts/runit",
+  "version": "1.0.0",
+  "main": "out/init.lua",
+  "scripts": {
+    "build": "rbxtsc",
+    "watch": "rbxtsc -w",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "rbxts",
+    "roblox",
+    "runit",
+    "xunit",
+    "unit",
+    "testing",
+    "test"
+  ],
+  "repository": {
+    "url": "git+https://github.com/R-unic/runit.git"
+  },
+  "author": "runicly",
+  "license": "ISC",
+  "description": "A unit testing library for Roblox heavily inspired by Xunit from C#",
+  "types": "out/index.d.ts",
+  "files": [
+    "out",
+    "!**/*.tsbuildinfo"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@rbxts/compiler-types": "^3.0.0-types.0",
+    "@rbxts/types": "^1.0.813",
+    "roblox-ts": "^3.0.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@flamework/core": "^1.2.3",
+    "@rbxts/array-utils": "^1.0.0",
+    "@rbxts/instance-utility": "^1.0.2",
+    "@rbxts/object-utils": "^1.0.4",
+    "@rbxts/range": "^1.0.0",
+    "@rbxts/string-builder": "^1.0.0",
+    "@rbxts/string-utils": "^1.0.3"
+  }
+}
