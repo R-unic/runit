@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/runit",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc",
@@ -40,6 +40,7 @@
     "@flamework/core": "^1.2.3",
     "@rbxts/array-utils": "^1.0.0",
     "@rbxts/instance-utility": "^1.0.2",
+    "@rbxts/lazy-iterator": "^1.0.1",
     "@rbxts/object-utils": "^1.0.4",
     "@rbxts/range": "^1.0.0",
     "@rbxts/string-builder": "^1.0.0",
