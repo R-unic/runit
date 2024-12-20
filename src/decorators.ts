@@ -11,8 +11,6 @@ export const Fact = Modding.createDecorator<void[]>("Method", descriptor => {
 });
 
 export const Theory = Modding.createDecorator<void[]>("Method", descriptor => {
-  if (Reflect.hasMetadata(descriptor.object, Meta.Theory))
-    throw Errors.NotBoth;
   if (Reflect.hasMetadata(descriptor.object, Meta.Fact))
     throw Errors.NotBoth;
 
