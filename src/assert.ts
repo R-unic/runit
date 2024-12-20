@@ -36,12 +36,66 @@ class AssertionFailedException {
 }
 
 class Assert {
-  public static throws(method: () => void): void
-  public static throws(method: () => void, exception: string): void
-  public static throws(method: () => void, exception?: string | ClassType): void {
+  public static propertyEqual(object: object, property: string, expectedValue: unknown): void {
+    const value = (<Record<string, unknown>>object)[property];
+    if (value === expectedValue) return;
+    throw new AssertionFailedException(`Expected object property "${property}" to be ${expectedValue}, got ${value}`);
+  }
+
+  public static hasProperty(object: object, property: string): void {
+    if (property in object) return;
+    throw new AssertionFailedException(`Expected object to have property "${property}"`);
+  }
+
+  public static async doesNotThrowAsync(method: () => Promise<void>): Promise<void> {
+    await method()
+      .catch(e => {
+        throw new AssertionFailedException(`Expected async method not to throw, threw:\n${e}`);
+      });
+  }
+
+  public static throwsAsync(method: () => Promise<void>): void
+  public static throwsAsync(method: () => Promise<void>, exception: string): void
+  public static async throwsAsync(method: () => Promise<void>, exception?: string | ClassType): Promise<void> {
+    let everythingIsFineHere = false;
+    let thrown: unknown = undefined;
+
+    await method()
+      .catch((e: unknown) => {
+        thrown = e;
+        if (exception !== undefined) {
+          if (typeOf(exception) === "string") {
+            if (e === exception)
+              everythingIsFineHere = true;
+          } else {
+            if (exception instanceof <ClassType>exception)
+              everythingIsFineHere = true;
+          }
+        } else
+          everythingIsFineHere = true;
+      });
+
+    if (everythingIsFineHere) return;
+    throw new AssertionFailedException(`Expected async method to throw${exception !== undefined ? `\nExpected: ${tostring(exception)}\nActual: ${thrown}` : ""}`);
+  }
+
+  public static doesNotThrow(method: () => void): void {
     try {
       method();
     } catch (e) {
+      throw new AssertionFailedException(`Expected method not to throw, threw:\n${e}`);
+    }
+  }
+
+  public static throws(method: () => void): void
+  public static throws(method: () => void, exception: string): void
+  public static throws(method: () => void, exception?: string | ClassType): void {
+    let thrown: unknown = undefined;
+
+    try {
+      method();
+    } catch (e) {
+      thrown = e;
       if (exception !== undefined) {
         if (typeOf(exception) === "string") {
           if (e === exception) return;
@@ -52,7 +106,7 @@ class Assert {
         return;
     }
 
-    throw new AssertionFailedException(`Expected method to throw`);
+    throw new AssertionFailedException(`Expected method to throw${exception !== undefined ? ' "' + tostring(exception) + `", threw "${thrown}"` : ""}`);
   }
 
   public static all<T extends defined>(array: T[], predicate: (element: T) => void): void {
@@ -142,7 +196,12 @@ class Assert {
 
   public static notUndefined(value: unknown): void {
     if (value !== undefined) return;
-    throw new AssertionFailedException(`Expected value to not be undefined`);
+    throw new AssertionFailedException("Expected value to not be undefined");
+  }
+
+  public static notEqual(expected: unknown, actual: unknown): void {
+    if (expected !== actual) return;
+    throw new AssertionFailedException("Expected values to be inequal");
   }
 
   public static equal(expected: unknown, actual: unknown): void {
