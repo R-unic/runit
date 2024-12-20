@@ -68,15 +68,16 @@ class TestRunner {
 
 				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = TestPassed;
 			}
-			const runTestCase = async (testCase: Callback, name: string, extra?: string): Promise<boolean> => {
+			const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
+				const inputDisplay = args !== undefined ? `input: (${(<defined[]>args).map(tostring).join(", ")})` : undefined;
 				try {
-					await testCase(testClass);
+					await testCase(testClass, ...args ?? []);
 				} catch (e) {
-					fail(e, name, extra);
+					fail(e, name, inputDisplay);
 					return false;
 				}
 
-				pass(name, extra);
+				pass(name, inputDisplay);
 				return true;
 			};
 
@@ -91,10 +92,8 @@ class TestRunner {
 					throw `No data was provided to Theory test "${theoryName}"`;
 
 				const theory = testClass[theoryName];
-				for (const args of reverse(testCases)) {
-					const inputDisplay = `input: (${(<defined[]>args).map(tostring).join(", ")})`;
-					if (!await runTestCase(theory, theoryName, inputDisplay)) continue;
-				}
+				for (const args of reverse(testCases))
+					if (!await runTestCase(theory, theoryName, args)) continue;
 			}
 		}
 
