@@ -129,7 +129,7 @@ class TestRunner {
 				.map(([_, { timeElapsed }]) => timeElapsed)
 				.reduce((sum, n) => sum + n);
 
-			let lastTestCaseName = testCases[0][0];
+			let lastTestCaseName;
 			results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${math.round(totalTime * 1000)}ms)`);
 			indent++;
 
