@@ -15,7 +15,7 @@ class AssertionFailedException {
     actual?: unknown
   ) {
     this.message = actual !== undefined ? `Expected: ${message}\nActual: ${actual}` : <string>message;
-    error(this.toString(), 4);
+    error(this.toString(), 5);
   }
 
   public static multipleFailures(totalItems: number, errors: [number, string, string][]): AssertionFailedException {

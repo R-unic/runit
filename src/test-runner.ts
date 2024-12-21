@@ -120,8 +120,8 @@ class TestRunner {
 
 		const appendIndent = () => results.append("  ".rep(indent));
 		const getSymbol = (passed: boolean) => colors ?
-			(passed ? `${GREEN}+${RESET}` : `${RED}x${RESET}`)
-			: (passed ? "+" : "x");
+			(passed ? `${GREEN}+${RESET}` : `${RED}×${RESET}`)
+			: (passed ? "+" : "×");
 
 		for (const [TestClass, testResultRecord] of pairs(this.results)) {
 			const allPassed = Object.values(testResultRecord)
@@ -144,10 +144,11 @@ class TestRunner {
 
 				const allPassed = cases.every(({ errorMessage }) => errorMessage === undefined);
 				const isLast = testResults.indexOf(testResult) === testResults.size() - 1;
+				const hasInputs = cases.size() > 0 && cases[0].inputs !== undefined;
 				appendIndent();
-				results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${math.round(totalElapsed * 1000)}ms)`);
+				results.appendLine(`${isLast || hasInputs ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${math.round(totalElapsed * 1000)}ms)`);
 
-				if (cases.size() > 0 && cases[0].inputs !== undefined) {
+				if (hasInputs) {
 					indent++;
 					for (const testCase of cases) {
 						const { errorMessage, timeElapsed, inputs } = testCase;
@@ -164,14 +165,25 @@ class TestRunner {
 		}
 
 		results.appendLine("");
+		results.appendLine("Failures:");
+
+		let failureIndex = 0;
 		for (const [_, testResults] of pairs(this.results))
 			for (const [testCaseName, cases] of pairs(testResults))
 				for (const { errorMessage, inputs } of cases) {
 					if (errorMessage === undefined) continue;
-					results.appendLine(testCaseName);
-					results.appendLine(`Inputs: ${this.formatInputs(inputs)}`);
-					results.appendLine(tostring(errorMessage));
+					results.appendLine(`${++failureIndex}. ${testCaseName}`);
+					indent++;
+
+					if (inputs !== undefined) {
+						appendIndent();
+						results.appendLine(`Inputs: ${this.formatInputs(inputs)}`);
+					}
+
+					const errorDisplay = (colors ? RED : "") + tostring(errorMessage).split("\n").map(line => "   ".rep(indent) + line).join("\n") + (colors ? RESET : "");
+					results.appendLine(errorDisplay);
 					results.appendLine("");
+					indent--;
 				}
 
 		const totalTests = this.passedTests + this.failedTests;
