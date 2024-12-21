@@ -22,7 +22,7 @@ type TestPassedSymbol = symbol & {
 	readonly __skip?: undefined;
 };
 
-const TestPassed = createSymbol<TestPassedSymbol>("Runit.TestPassed");
+const TestPassed = createSymbol<TestPassedSymbol>("rUnit.TestPassed");
 
 class TestRunner {
 	private readonly testClasses: [Constructor<TestClassInstance>, TestClassInstance][];
@@ -107,12 +107,13 @@ class TestRunner {
 
 		const appendIndent = () => results.append("  ".rep(indent));
 
-		for (const [TestClass, testCases] of pairs(this.results)) {
-			const allPassed = Object.values(testCases).every(value => value === TestPassed);
+		for (const [TestClass, testCaseRecord] of pairs(this.results)) {
+			const allPassed = Object.values(testCaseRecord).every(value => value === TestPassed);
 			results.appendLine(`[${allPassed ? "+" : "x"}] ${TestClass}`);
 
+			const testCases = reverse(Object.entries(testCaseRecord)).sort(([nameA], [nameB]) => nameA < nameB);
 			indent++;
-			for (const [testCaseName, message] of reverse(Object.entries(testCases))) {
+			for (const [testCaseName, message] of testCases) {
 				const passed = message === TestPassed;
 				appendIndent();
 				results.appendLine(`[${passed ? "+" : "x"}] ${testCaseName}`)
