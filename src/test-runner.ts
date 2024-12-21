@@ -8,6 +8,10 @@ import repr from "@rbxts/repr";
 
 import { type Maybe, Meta } from "./common";
 
+const GREEN = "\x1b[32m";
+const RED = "\x1b[31m";
+const RESET = "\x1b[0m";
+
 interface TestCaseResult {
 	readonly errorMessage?: string;
 	readonly timeElapsed: number;
@@ -103,7 +107,7 @@ class TestRunner {
 		const appendIndent = () => results.append("  ".rep(indent));
 		const getSymbol = (passed: boolean) => colors ?
 			(passed ? "+" : "x")
-			: passed ? "+" : "x";
+			: passed ? `${GREEN}+${RESET}` : `${RED}x${RESET}`;
 
 		for (const [TestClass, testCaseRecord] of pairs(this.results)) {
 			const allPassed = Object.values(testCaseRecord)
@@ -116,10 +120,12 @@ class TestRunner {
 
 			results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${math.round(totalTime * 1000)}ms)`);
 			indent++;
-			for (const [testCaseName, { errorMessage, timeElapsed }] of testCases) {
+			for (const testCase of testCases) {
+				const [testCaseName, { errorMessage, timeElapsed }] = testCase;
+				const isLast = testCases.indexOf(testCase) === testCases.size() - 1;
 				const passed = errorMessage === undefined;
 				appendIndent();
-				results.appendLine(`[${getSymbol(passed)}] ${testCaseName} (${math.round(timeElapsed * 1000)}ms)`)
+				results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${testCaseName} (${math.round(timeElapsed * 1000)}ms)`)
 			}
 			indent--;
 		}
@@ -135,8 +141,8 @@ class TestRunner {
 
 		const totalTests = this.passedTests + this.failedTests;
 		results.appendLine(`Ran ${totalTests} tests in ${math.round(elapsedTime * 1000)}ms`);
-		results.appendLine(`Passed: ${this.passedTests}`);
-		results.appendLine(`Failed: ${this.failedTests}`);
+		results.appendLine(`${colors ? GREEN : ""}Passed: ${this.passedTests}${colors ? RESET : ""}`);
+		results.appendLine(`${colors ? RED : ""}Failed: ${this.failedTests}${colors ? RESET : ""}`);
 
 		return results.toString();
 	}
