@@ -1,5 +1,5 @@
 import { Modding, Reflect } from "@flamework/core";
-import { Maybe, Errors, Meta } from "./common";
+import { type Maybe, Errors, Meta } from "./common";
 
 export const Fact = Modding.createDecorator<void[]>("Method", descriptor => {
   if (Reflect.hasMetadata(descriptor.object, Meta.TestData))

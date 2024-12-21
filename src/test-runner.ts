@@ -4,31 +4,22 @@ import { StringBuilder } from "@rbxts/string-builder";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
 import { flatten, reverse } from "@rbxts/array-utils";
 import Object from "@rbxts/object-utils";
+import repr from "@rbxts/repr";
 
-import { Maybe, Meta } from "./common";
+import { type Maybe, Meta } from "./common";
 
-declare const newproxy: <T extends symbol = symbol>(addMetatable: boolean) => T;
-
-/** Create a unique symbol */
-function createSymbol<T extends symbol = symbol>(name: string): T {
-	const symbol = newproxy<T>(true);
-	const mt = <Record<string, unknown>>getmetatable(<never>symbol);
-	mt.__tostring = () => name;
-	return symbol;
+interface TestCaseResult {
+	readonly errorMessage?: string;
+	readonly timeElapsed: number;
 }
 
 type TestClassInstance = Record<string, Callback>;
-type TestPassedSymbol = symbol & {
-	readonly __skip?: undefined;
-};
-
-const TestPassed = createSymbol<TestPassedSymbol>("rUnit.TestPassed");
 
 class TestRunner {
 	private readonly testClasses: [Constructor<TestClassInstance>, TestClassInstance][];
 	private failedTests = 0;
 	private passedTests = 0;
-	private results = new Map<Constructor, Record<string, string | TestPassedSymbol>>;
+	private results = new Map<Constructor, Record<string, TestCaseResult>>;
 
 	public constructor(...roots: Instance[]) {
 		this.testClasses = flatten(roots.map(root => getDescendantsOfType(root, "ModuleScript")))
@@ -40,9 +31,7 @@ class TestRunner {
 			});
 	}
 
-	public async run(): Promise<void>
-	public async run(reporter: (testResults: string) => void): Promise<void>
-	public async run(reporter: (testResults: string) => void = print): Promise<void> {
+	public async run(reporter: (testResults: string) => void = print, colors = false): Promise<void> {
 		this.results = new Map;
 
 		const start = os.clock();
@@ -51,33 +40,39 @@ class TestRunner {
 			const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property))
 			const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
 
-			const fail = (exception: unknown, name: string, extra?: string): void => {
+			const fail = (exception: unknown, name: string, timeElapsed: number, extra?: string): void => {
 				this.failedTests++;
 
 				let classResults = this.results.get(TestClass);
 				if (classResults === undefined)
 					classResults = this.results.set(TestClass, {}).get(TestClass)!;
 
-				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = tostring(exception);
+				classResults[`${name}${extra !== undefined ? " - " + extra : ""}`] = {
+					errorMessage: tostring(exception),
+					timeElapsed
+				};
 			}
-			const pass = (name: string, extra?: string): void => {
+			const pass = (name: string, timeElapsed: number, extra?: string): void => {
 				this.passedTests++;
 				let classResults = this.results.get(TestClass);
 				if (classResults === undefined)
 					classResults = this.results.set(TestClass, {}).get(TestClass)!;
 
-				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = TestPassed;
+				classResults[`${name}${extra !== undefined ? " | " + extra : ""}`] = { timeElapsed };
 			}
 			const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
-				const inputDisplay = args !== undefined ? `input: (${(<defined[]>args).map(tostring).join(", ")})` : undefined;
+				const inputDisplay = args !== undefined ? `input: (${(<defined[]>args).map(v => repr(v, { pretty: false })).join(", ")})` : undefined;
+				const start = os.clock();
 				try {
 					await testCase(testClass, ...args ?? []);
 				} catch (e) {
-					fail(e, name, inputDisplay);
+					const timeElapsed = os.clock() - start;
+					fail(e, name, timeElapsed, inputDisplay);
 					return false;
 				}
 
-				pass(name, inputDisplay);
+				const timeElapsed = os.clock() - start;
+				pass(name, timeElapsed, inputDisplay);
 				return true;
 			};
 
@@ -98,35 +93,43 @@ class TestRunner {
 		}
 
 		const elapsedTime = os.clock() - start;
-		reporter(this.generateOutput(elapsedTime));
+		reporter(this.generateOutput(elapsedTime, colors));
 	}
 
-	private generateOutput(elapsedTime: number): string {
+	private generateOutput(elapsedTime: number, colors: boolean): string {
 		const results = new StringBuilder;
 		let indent = 0;
 
 		const appendIndent = () => results.append("  ".rep(indent));
+		const getSymbol = (passed: boolean) => colors ?
+			(passed ? "+" : "x")
+			: passed ? "+" : "x";
 
 		for (const [TestClass, testCaseRecord] of pairs(this.results)) {
-			const allPassed = Object.values(testCaseRecord).every(value => value === TestPassed);
-			results.appendLine(`[${allPassed ? "+" : "x"}] ${TestClass}`);
+			const allPassed = Object.values(testCaseRecord)
+				.every(({ errorMessage }) => errorMessage === undefined);
+			const testCases = reverse(Object.entries(testCaseRecord))
+				.sort(([nameA], [nameB]) => nameA < nameB);
+			const totalTime = testCases
+				.map(([_, { timeElapsed }]) => timeElapsed)
+				.reduce((sum, n) => sum + n);
 
-			const testCases = reverse(Object.entries(testCaseRecord)).sort(([nameA], [nameB]) => nameA < nameB);
+			results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${math.round(totalTime * 1000)}ms)`);
 			indent++;
-			for (const [testCaseName, message] of testCases) {
-				const passed = message === TestPassed;
+			for (const [testCaseName, { errorMessage, timeElapsed }] of testCases) {
+				const passed = errorMessage === undefined;
 				appendIndent();
-				results.appendLine(`[${passed ? "+" : "x"}] ${testCaseName}`)
+				results.appendLine(`[${getSymbol(passed)}] ${testCaseName} (${math.round(timeElapsed * 1000)}ms)`)
 			}
 			indent--;
 		}
 
 		results.appendLine("");
 		for (const [_, testCases] of pairs(this.results))
-			for (const [testCaseName, message] of pairs(testCases)) {
-				if (message === TestPassed) continue;
-				results.append(testCaseName + "  -  ");
-				results.appendLine(<string>message);
+			for (const [testCaseName, { errorMessage }] of pairs(testCases)) {
+				if (errorMessage === undefined) continue;
+				results.append(testCaseName + " - ");
+				results.appendLine(tostring(errorMessage));
 				results.appendLine("");
 			}
 
