@@ -1,6 +1,6 @@
 # Runit
 ### pronounced "R Unit"
-A unit testing library for Roblox heavily inspired by Xunit from C#
+A unit testing library for Roblox heavily inspired by xUnit from C#
 
 ## Example
 

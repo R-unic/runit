@@ -31,7 +31,7 @@ const DEFAULT_TEST_RUN_OPTIONS: TestRunOptions = {
 
 class TestRunner {
 	private readonly testClasses: [Constructor<TestClassInstance>, TestClassInstance][];
-	private results = new Map<Constructor, Record<string, TestCaseResult>>;
+	private results = new Map<Constructor, Record<string, TestCaseResult[]>>;
 	private failedTests = 0;
 	private passedTests = 0;
 
@@ -55,27 +55,30 @@ class TestRunner {
 			const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property))
 			const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
 
-			const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
-				this.failedTests++;
-
+			const addResult = (name: string, result: TestCaseResult) => {
 				let classResults = this.results.get(TestClass);
 				if (classResults === undefined)
 					classResults = this.results.set(TestClass, {}).get(TestClass)!;
 
-				classResults[name] = {
+				const results = classResults[name] ?? [];
+				results.push(result);
+				classResults[name] = results;
+			};
+			const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
+				this.failedTests++;
+				addResult(name, {
 					errorMessage: tostring(exception),
 					timeElapsed,
 					inputs
-				};
-			}
+				});
+			};
 			const pass = (name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
 				this.passedTests++;
-				let classResults = this.results.get(TestClass);
-				if (classResults === undefined)
-					classResults = this.results.set(TestClass, {}).get(TestClass)!;
-
-				classResults[name] = { timeElapsed, inputs };
-			}
+				addResult(name, {
+					timeElapsed,
+					inputs
+				});
+			};
 			const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
 				const start = os.clock();
 				try {
@@ -117,55 +120,59 @@ class TestRunner {
 
 		const appendIndent = () => results.append("  ".rep(indent));
 		const getSymbol = (passed: boolean) => colors ?
-			(passed ? "+" : "x")
-			: passed ? `${GREEN}+${RESET}` : `${RED}x${RESET}`;
+			(passed ? `${GREEN}+${RESET}` : `${RED}x${RESET}`)
+			: (passed ? "+" : "x");
 
-		for (const [TestClass, testCaseRecord] of pairs(this.results)) {
-			const allPassed = Object.values(testCaseRecord)
-				.every(({ errorMessage }) => errorMessage === undefined);
-			const testCases = reverse(Object.entries(testCaseRecord))
+		for (const [TestClass, testResultRecord] of pairs(this.results)) {
+			const allPassed = Object.values(testResultRecord)
+				.every(cases => cases.every(({ errorMessage }) => errorMessage === undefined));
+			const testResults = reverse(Object.entries(testResultRecord))
 				.sort(([nameA], [nameB]) => nameA < nameB);
-			const totalTime = testCases
-				.map(([_, { timeElapsed }]) => timeElapsed)
+			const totalTime = testResults
+				.map(([_, cases]) => cases.map(result => result.timeElapsed).reduce((sum, n) => sum + n))
 				.reduce((sum, n) => sum + n);
 
-			let lastTestCaseName;
 			results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${math.round(totalTime * 1000)}ms)`);
 			indent++;
 
-			for (const testCase of testCases) {
-				const [testCaseName, { errorMessage, timeElapsed, inputs }] = testCase;
-				const totalElapsed = testCases
+			for (const testResult of testResults) {
+				const [testCaseName, cases] = testResult;
+				const totalElapsed = testResults
 					.filter(([name]) => name === testCaseName)
-					.map(([_, { timeElapsed }]) => timeElapsed)
+					.map(([_, cases]) => cases.map(result => result.timeElapsed).reduce((sum, n) => sum + n))
 					.reduce((sum, n) => sum + n);
 
-				const isLast = testCases.indexOf(testCase) === testCases.size() - 1;
-				const passed = errorMessage === undefined;
+				const allPassed = cases.every(({ errorMessage }) => errorMessage === undefined);
+				const isLast = testResults.indexOf(testResult) === testResults.size() - 1;
 				appendIndent();
+				results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${math.round(totalElapsed * 1000)}ms)`);
 
-				if (testCaseName !== lastTestCaseName)
-					results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${testCaseName} (${math.round(totalElapsed * 1000)}ms)`);
-				else {
-					appendIndent();
-					results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] (${this.formatInputs(inputs)}) (${math.round(timeElapsed * 1000)}ms)`);
+				if (cases.size() > 0 && cases[0].inputs !== undefined) {
+					indent++;
+					for (const testCase of cases) {
+						const { errorMessage, timeElapsed, inputs } = testCase;
+						const isLast = cases.indexOf(testCase) === cases.size() - 1;
+						const passed = errorMessage === undefined;
+						appendIndent();
+						results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${math.round(timeElapsed * 1000)}ms)`);
+					}
+					indent--;
 				}
-
-				lastTestCaseName = testCaseName;
 			}
 
 			indent--;
 		}
 
 		results.appendLine("");
-		for (const [_, testCases] of pairs(this.results))
-			for (const [testCaseName, { errorMessage, inputs }] of pairs(testCases)) {
-				if (errorMessage === undefined) continue;
-				results.appendLine(testCaseName);
-				results.appendLine(`Inputs: ${this.formatInputs(inputs)}`);
-				results.appendLine(tostring(errorMessage));
-				results.appendLine("");
-			}
+		for (const [_, testResults] of pairs(this.results))
+			for (const [testCaseName, cases] of pairs(testResults))
+				for (const { errorMessage, inputs } of cases) {
+					if (errorMessage === undefined) continue;
+					results.appendLine(testCaseName);
+					results.appendLine(`Inputs: ${this.formatInputs(inputs)}`);
+					results.appendLine(tostring(errorMessage));
+					results.appendLine("");
+				}
 
 		const totalTests = this.passedTests + this.failedTests;
 		results.appendLine(`Ran ${totalTests} tests in ${math.round(elapsedTime * 1000)}ms`);
