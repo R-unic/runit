@@ -164,8 +164,11 @@ class TestRunner {
 			indent--;
 		}
 
-		results.appendLine("");
-		results.appendLine("Failures:");
+
+		if (this.failedTests > 0) {
+			results.appendLine("");
+			results.appendLine("Failures:");
+		}
 
 		let failureIndex = 0;
 		for (const [_, testResults] of pairs(this.results))
@@ -187,6 +190,7 @@ class TestRunner {
 				}
 
 		const totalTests = this.passedTests + this.failedTests;
+		results.appendLine("");
 		results.appendLine(`Ran ${totalTests} tests in ${math.round(elapsedTime * 1000)}ms`);
 		results.appendLine(`${colors ? GREEN : ""}Passed: ${this.passedTests}${colors ? RESET : ""}`);
 		results.appendLine(`${colors ? RED : ""}Failed: ${this.failedTests}${colors ? RESET : ""}`);
