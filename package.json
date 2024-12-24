@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/runit",
-  "version": "1.1.9",
+  "version": "1.2.0",
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc",
@@ -43,7 +43,7 @@
     "@rbxts/object-utils": "^1.0.4",
     "@rbxts/range": "^1.0.0",
     "@rbxts/repr": "^1.0.1",
-    "@rbxts/string-builder": "^1.0.1",
+    "@rbxts/string-builder": "^1.0.2",
     "@rbxts/string-utils": "^1.0.3"
   }
 }
