@@ -39,7 +39,7 @@
   "dependencies": {
     "@flamework/core": "^1.2.3",
     "@rbxts/array-utils": "^1.0.1",
-    "@rbxts/instance-utility": "^1.0.2",
+    "@rbxts/instance-utility": "^1.0.3",
     "@rbxts/object-utils": "^1.0.4",
     "@rbxts/range": "^1.0.0",
     "@rbxts/repr": "^1.0.1",
