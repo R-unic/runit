@@ -174,9 +174,9 @@ class Assert {
   }
 
   /** @metadata macro */
-  public static isType<Expected, Actual = unknown>(value: Actual, guard?: t.check<Expected> | Modding.Generic<Expected, "guard">): void {
+  public static isType<Expected>(value: unknown, guard?: t.check<Expected> | Modding.Generic<Expected, "guard">): value is Expected {
     const matches = guard?.(value) ?? false;
-    if (matches) return;
+    if (matches) return true;
 
     // TODO: improve message using either @rbxts/reflect or rbxts-transform-debug
     throw new AssertionFailedException(`Type did not pass the type guard`);
