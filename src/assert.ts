@@ -1,5 +1,7 @@
+import { Modding } from "@flamework/core";
 import { Range } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
+import { t } from "@rbxts/t";
 
 type ClassType<T = object, Args extends unknown[] = never[]> = {
   new(...args: Args): T;
@@ -171,7 +173,16 @@ class Assert {
     }
   }
 
-  public static isType(value: unknown, expectedType: keyof CheckableTypes | ClassType): void {
+  /** @metadata macro */
+  public static isType<Expected, Actual>(value: Actual, guard?: t.check<Expected> | Modding.Generic<Expected, "guard">): void {
+    const matches = guard?.(value) ?? false;
+    if (matches) return;
+
+    // TODO: improve message using either @rbxts/reflect or rbxts-transform-debug
+    throw new AssertionFailedException(`Type did not pass the type guard`);
+  }
+
+  public static isCheckableType(value: unknown, expectedType: keyof CheckableTypes | ClassType): void {
     if (typeOf(expectedType) === "string") {
       const actualType = typeOf(value);
       if (actualType === expectedType) return;

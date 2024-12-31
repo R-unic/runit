@@ -1,0 +1,11 @@
+{
+	"version": 1,
+	"flameworkVersion": "1.2.3",
+	"identifiers": {
+		"@rbxts/runit:out/assert@AssertionFailedException": "@rbxts/runit:assert@AssertionFailedException",
+		"@rbxts/runit:out/assert@Assert": "@rbxts/runit:assert@Assert",
+		"@rbxts/runit:out/test-runner@TestRunner": "@rbxts/runit:test-runner@TestRunner"
+	},
+	"metadata": {},
+	"identifierPrefix": "@rbxts/runit"
+}

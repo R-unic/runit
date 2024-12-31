@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/runit",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc",
@@ -33,17 +33,18 @@
   "devDependencies": {
     "@rbxts/compiler-types": "^3.0.0-types.0",
     "@rbxts/types": "^1.0.813",
+    "rbxts-transformer-flamework": "latest",
     "roblox-ts": "^3.0.0",
-    "typescript": "^5.7.2"
+    "typescript": "=5.5.2"
   },
   "dependencies": {
-    "@flamework/core": "^1.2.3",
+    "@flamework/core": "latest",
     "@rbxts/array-utils": "^1.0.1",
     "@rbxts/instance-utility": "^1.0.3",
-    "@rbxts/object-utils": "^1.0.4",
     "@rbxts/range": "^1.0.0",
     "@rbxts/repr": "^1.0.1",
     "@rbxts/string-builder": "^1.0.2",
-    "@rbxts/string-utils": "^1.0.3"
+    "@rbxts/string-utils": "^1.0.3",
+    "@rbxts/t": "^3.1.1"
   }
 }
