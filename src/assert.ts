@@ -174,7 +174,7 @@ class Assert {
   }
 
   /** @metadata macro */
-  public static isType<Expected, Actual>(value: Actual, guard?: t.check<Expected> | Modding.Generic<Expected, "guard">): void {
+  public static isType<Expected, Actual = unknown>(value: Actual, guard?: t.check<Expected> | Modding.Generic<Expected, "guard">): void {
     const matches = guard?.(value) ?? false;
     if (matches) return;
 
