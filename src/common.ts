@@ -9,4 +9,5 @@ export const enum Meta {
   Fact = "runit:fact",
   Theory = "runit:theory",
   TestData = "runit:test_data",
+  LoadOrder = "runit:load_order",
 }

@@ -9,6 +9,7 @@ import { type Maybe, Meta } from "./common";
 import repr from "@rbxts/repr";
 
 type TestClassInstance = Record<string, Callback>;
+type TestClassConstructor = Constructor<TestClassInstance>;
 
 interface TestCaseResult {
 	readonly errorMessage?: string;
@@ -30,18 +31,23 @@ const DEFAULT_TEST_RUN_OPTIONS: TestRunOptions = {
 };
 
 class TestRunner {
-	private readonly testClasses: [Constructor<TestClassInstance>, TestClassInstance][];
+	private readonly testClasses: [TestClassConstructor, TestClassInstance][];
 	private results = new Map<Constructor, Record<string, TestCaseResult[]>>;
 	private failedTests = 0;
 	private passedTests = 0;
 
 	public constructor(...roots: Instance[]) {
 		this.testClasses = flatten(roots.map(root => getDescendantsOfType(root, "ModuleScript")))
-			.map(module => {
-				const TestClass = <Constructor<TestClassInstance>>require(module);
+			.map<[TestClassConstructor, TestClassInstance]>(module => {
+				const TestClass = <TestClassConstructor>require(module);
 				(<any>TestClass).__moduleInstance = module;
 				(<any>TestClass).__isNested = module.Parent !== undefined && !roots.includes(module.Parent);
 				return [TestClass, new TestClass];
+			})
+			.sort(([classA], [classB]) => {
+				const orderA = Reflect.getMetadata<number>(classA, Meta.LoadOrder) ?? math.huge;
+				const orderB = Reflect.getMetadata<number>(classB, Meta.LoadOrder) ?? math.huge;
+				return orderA < orderB;
 			});
 	}
 
@@ -124,10 +130,9 @@ class TestRunner {
 			: (passed ? "+" : "×");
 
 		for (const [TestClass, testResultRecord] of pairs(this.results)) {
-			const allPassed = Object.values(testResultRecord)
-				.every(cases => cases.every(({ errorMessage }) => errorMessage === undefined));
-			const testResults = reverse(Object.entries(testResultRecord))
-				.sort(([nameA], [nameB]) => nameA < nameB);
+			const testResults = Object.entries(testResultRecord);
+			const allPassed = testResults
+				.every(([_, cases]) => cases.every(({ errorMessage }) => errorMessage === undefined));
 			const totalTime = testResults
 				.map(([_, cases]) => cases.map(result => result.timeElapsed).reduce((sum, n) => sum + n))
 				.reduce((sum, n) => sum + n);

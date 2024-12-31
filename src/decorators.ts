@@ -28,3 +28,7 @@ export function InlineData<T extends object, Args extends unknown[]>(...args: Ar
     Reflect.defineMetadata(ctor, Meta.TestData, dataMeta, propertyKey);
   }
 }
+
+export const Order = Modding.createDecorator<[order: number]>("Class", (descriptor, [order]) =>
+  Reflect.defineMetadata(descriptor.object, Meta.LoadOrder, order)
+);
