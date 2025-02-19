@@ -1,5 +1,5 @@
 {
-  "name": "@rbxts/runit",
+  "name": "runit",
   "version": "1.2.3",
   "main": "out/init.lua",
   "scripts": {

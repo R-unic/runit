@@ -1,21 +1,21 @@
 import { Modding, Reflect } from "@flamework/core";
 import { type Maybe, Errors, Meta } from "./common";
 
-export const Fact = Modding.createDecorator<void[]>("Method", descriptor => {
-  if (Reflect.hasMetadata(descriptor.object, Meta.TestData))
+export function Fact<T extends object>(ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: void[]) => void>): void {
+  if (Reflect.hasMetadata(ctor, Meta.TestData))
     throw Errors.UnexpectedData;
-  if (Reflect.hasMetadata(descriptor.object, Meta.Theory))
+  if (Reflect.hasMetadata(ctor, Meta.Theory))
     throw Errors.NotBoth;
 
-  Reflect.defineMetadata(descriptor.object, Meta.Fact, true, descriptor.property);
-});
+  Reflect.defineMetadata(ctor, Meta.Fact, true, propertyKey);
+};
 
-export const Theory = Modding.createDecorator<void[]>("Method", descriptor => {
-  if (Reflect.hasMetadata(descriptor.object, Meta.Fact))
+export function Theory<T extends object, Args extends unknown[]>(ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args) => void>): void {
+  if (Reflect.hasMetadata(ctor, Meta.Fact))
     throw Errors.NotBoth;
 
-  Reflect.defineMetadata(descriptor.object, Meta.Theory, true, descriptor.property);
-});
+  Reflect.defineMetadata(ctor, Meta.Theory, true, propertyKey);
+};
 
 export function InlineData<T extends object, Args extends unknown[]>(...args: Args) {
   return (ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args) => void>) => {

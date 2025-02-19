@@ -59,25 +59,18 @@ class Assert {
   public static throwsAsync(method: () => Promise<void>): void
   public static throwsAsync(method: () => Promise<void>, exception: string): void
   public static async throwsAsync(method: () => Promise<void>, exception?: string | ClassType): Promise<void> {
-    let everythingIsFineHere = false;
+    let exceptionThrown = false;
     let thrown: unknown = undefined;
 
     await method()
       .catch((e: unknown) => {
         thrown = e;
-        if (exception !== undefined) {
-          if (typeOf(exception) === "string") {
-            if (e === exception)
-              everythingIsFineHere = true;
-          } else {
-            if (exception instanceof <ClassType>exception)
-              everythingIsFineHere = true;
-          }
-        } else
-          everythingIsFineHere = true;
+        exceptionThrown = exception !== undefined && typeOf(exception) === "string"
+          ? e === exception || e instanceof <ClassType>exception
+          : true;
       });
 
-    if (everythingIsFineHere) return;
+    if (exceptionThrown) return;
     throw new AssertionFailedException(`Expected async method to throw${exception !== undefined ? `\nExpected: ${tostring(exception)}\nActual: ${thrown}` : ""}`);
   }
 
@@ -113,23 +106,23 @@ class Assert {
 
   public static all<T extends defined>(array: T[], predicate: (element: T) => void): void {
     const errors: [number, string, string][] = [];
-    let index = 0;
+    let count = 0;
 
     for (const element of array) {
       try {
         predicate(element);
       } catch (e) {
-        errors.push([index, tostring(element), tostring(e)]);
+        errors.push([count, tostring(element), tostring(e)]);
       }
-      index++;
+      count++;
     }
 
     if (errors.size() > 0)
-      throw AssertionFailedException.multipleFailures(index, errors);
+      throw AssertionFailedException.multipleFailures(count, errors);
   }
 
-  public static doesNotContain<T extends defined>(expectedElement: T, array: T[]): void {
-    if (!array.includes(expectedElement)) return;
+  public static doesNotContain<T extends defined>(element: T, array: T[]): void {
+    if (!array.includes(element)) return;
     throw new AssertionFailedException(`Expected array to not contain element "${array}"`);
   }
 
@@ -179,7 +172,7 @@ class Assert {
     if (matches) return true;
 
     // TODO: improve message using either @rbxts/reflect or rbxts-transform-debug
-    throw new AssertionFailedException(`Type did not pass the type guard`);
+    throw new AssertionFailedException(`Type did not pass the provided type guard ${guard}`);
   }
 
   public static isCheckableType(value: unknown, expectedType: keyof CheckableTypes | ClassType): void {
@@ -187,10 +180,10 @@ class Assert {
       const actualType = typeOf(value);
       if (actualType === expectedType) return;
       throw new AssertionFailedException(`Expected type: ${expectedType}\nActual type: ${actualType}`);
-    } else {
-      if (value instanceof <ClassType>expectedType) return;
-      throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`);
     }
+
+    if (value instanceof <ClassType>expectedType) return;
+    throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`);
   }
 
   public static true(value: unknown): void {

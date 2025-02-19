@@ -35,13 +35,13 @@ function toNearestFiveOrTen(n: number): number {
 
 class NumberUtilityTest {
   // tests one case
-  @Fact()
+  @Fact
   public eightBecomesTen(): void {
     Assert.equal(10, toNearestFiveOrTen(8));
   }
 
   // tests multiple cases
-  @Theory()
+  @Theory
   @InlineData(8, 10)
   @InlineData(14, 15)
   @InlineData(18, 20)
