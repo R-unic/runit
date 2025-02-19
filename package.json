@@ -1,6 +1,6 @@
 {
-  "name": "runit",
-  "version": "1.2.3",
+  "name": "@rbxts/runit",
+  "version": "1.2.4",
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc",
