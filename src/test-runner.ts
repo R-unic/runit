@@ -4,9 +4,9 @@ import { StringBuilder } from "@rbxts/string-builder";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
 import { flatten, reverse } from "@rbxts/array-utils";
 import Object from "@rbxts/object-utils";
+import repr from "@rbxts/repr";
 
 import { type Maybe, Meta } from "./common";
-import repr from "@rbxts/repr";
 
 type TestClassInstance = Record<string, Callback>;
 type TestClassConstructor = Constructor<TestClassInstance>;
@@ -65,68 +65,71 @@ class TestRunner {
 
     const { reporter, colors }: TestRunOptions = Object.assign({}, DEFAULT_TEST_RUN_OPTIONS, options);
     const start = os.clock();
-    for (const [TestClass, testClass] of this.testClasses) {
-      const properties = Reflect.getProperties(TestClass);
-      const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property))
-      const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
-
-      const addResult = (name: string, result: TestCaseResult) => {
-        let classResults = this.results.get(TestClass);
-        if (classResults === undefined)
-          classResults = this.results.set(TestClass, {}).get(TestClass)!;
-
-        const results = classResults[name] ?? [];
-        results.push(result);
-        classResults[name] = results;
-      };
-      const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
-        this.failedTests++;
-        addResult(name, {
-          errorMessage: tostring(exception),
-          timeElapsed,
-          inputs
-        });
-      };
-      const pass = (name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
-        this.passedTests++;
-        addResult(name, {
-          timeElapsed,
-          inputs
-        });
-      };
-      const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
-        const start = os.clock();
-        try {
-          await testCase(testClass, ...args ?? []);
-        } catch (e) {
-          const timeElapsed = os.clock() - start;
-          fail(e, name, { timeElapsed, inputs: args });
-          return false;
-        }
-
-        const timeElapsed = os.clock() - start;
-        pass(name, { timeElapsed, inputs: args });
-        return true;
-      };
-
-      for (const factName of factNames) {
-        const fact = testClass[factName];
-        if (!await runTestCase(fact, factName)) continue;
-      }
-
-      for (const theoryName of theoryNames) {
-        const testCases = <Maybe<unknown[][]>>Reflect.getMetadata(TestClass, Meta.TestData, theoryName);
-        if (testCases === undefined)
-          throw `No data was provided to Theory test "${theoryName}"`;
-
-        const theory = testClass[theoryName];
-        for (const args of reverse(testCases))
-          if (!await runTestCase(theory, theoryName, args)) continue;
-      }
-    }
+    for (const [TestClass, testClass] of this.testClasses)
+      await this.runTestClass(TestClass, testClass);
 
     const elapsedTime = os.clock() - start;
     reporter(this.generateOutput(elapsedTime, colors));
+  }
+
+  private async runTestClass(TestClass: TestClassConstructor, testClass: TestClassInstance): Promise<void> {
+    const properties = Reflect.getProperties(TestClass);
+    const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property));
+    const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
+
+    const addResult = (name: string, result: TestCaseResult) => {
+      let classResults = this.results.get(TestClass);
+      if (classResults === undefined)
+        classResults = this.results.set(TestClass, {}).get(TestClass)!;
+
+      const results = classResults[name] ?? [];
+      results.push(result);
+      classResults[name] = results;
+    };
+    const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
+      this.failedTests++;
+      addResult(name, {
+        errorMessage: tostring(exception),
+        timeElapsed,
+        inputs
+      });
+    };
+    const pass = (name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
+      this.passedTests++;
+      addResult(name, {
+        timeElapsed,
+        inputs
+      });
+    };
+    const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
+      const start = os.clock();
+      try {
+        await testCase(testClass, ...args ?? []);
+      } catch (e) {
+        const timeElapsed = os.clock() - start;
+        fail(e, name, { timeElapsed, inputs: args });
+        return false;
+      }
+
+      const timeElapsed = os.clock() - start;
+      pass(name, { timeElapsed, inputs: args });
+      return true;
+    };
+
+    for (const factName of factNames) {
+      const fact = testClass[factName];
+      if (!await runTestCase(fact, factName)) continue;
+    }
+
+    for (const theoryName of theoryNames) {
+      const testCases = <Maybe<unknown[][]>>Reflect.getMetadata(TestClass, Meta.TestData, theoryName);
+      if (testCases === undefined)
+        throw `No data was provided to Theory test "${theoryName}"`;
+
+      const theory = testClass[theoryName];
+      for (const args of reverse(testCases))
+        if (!await runTestCase(theory, theoryName, args)) continue;
+    }
   }
 
   private generateOutput(elapsedTime: number, colors: boolean): string {
