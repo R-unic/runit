@@ -1,5 +1,5 @@
 import { Modding } from "@flamework/core";
-import { Range } from "@rbxts/range";
+import { Range, RangeJSON } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
 
 type ClassType<T = object, Args extends unknown[] = never[]> = {
@@ -148,14 +148,16 @@ class Assert {
     throw new AssertionFailedException(`Expected string "${str}" to end with substring "${substring}"`);
   }
 
+  public static inRange(number: number, range: RangeJSON): void
   public static inRange(number: number, range: Range): void
   public static inRange(number: number, minimum: number, maximum: number): void
-  public static inRange(number: number, minimum: number | Range, maximum?: number): void {
-    if (typeOf(minimum) === "number") {
+  public static inRange(number: number, minimum: number | Range | RangeJSON, maximum?: number): void {
+    const isNumber = (value: unknown): value is number => typeOf(minimum) === "number";
+    if (isNumber(minimum)) {
       if (number >= (minimum as number) && number <= maximum!) return;
       throw new AssertionFailedException(`${minimum}-${maximum}`, number);
     } else {
-      const range = minimum as Range;
+      const range = minimum instanceof Range ? minimum : Range.fromJSON(minimum);
       if (!range.isNumberWithin(number)) return;
       throw new AssertionFailedException(range.toString(), number);
     }
