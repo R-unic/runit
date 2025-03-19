@@ -20,10 +20,7 @@
       "node_modules/@flamework"
     ],
     // configurable
-    "rootDirs": [
-      "src",
-      "dev/src"
-    ],
+    "rootDir": "src",
     "outDir": "out",
     "incremental": true,
     "tsBuildInfoFile": "out/tsconfig.tsbuildinfo",
@@ -34,5 +31,8 @@
         "obfuscation": false
       }
     ]
-  }
+  },
+  "exclude": [
+    "dev"
+  ]
 }
