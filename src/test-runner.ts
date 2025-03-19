@@ -185,7 +185,7 @@ class TestRunner {
             indent++;
             results.append("│");
             appendIndent();
-            results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${formatTime(timeElapsed)}ms)`);
+            results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${formatTime(timeElapsed)})`);
           }
           indent--;
         }
@@ -220,7 +220,7 @@ class TestRunner {
 
     const totalTests = this.passedTests + this.failedTests;
     results.appendLine("");
-    results.appendLine(`Ran ${totalTests} tests in ${formatTime(elapsedTime)}ms`);
+    results.appendLine(`Ran ${totalTests} tests in ${formatTime(elapsedTime)}`);
     results.appendLine(`${colors ? GREEN : ""}Passed: ${this.passedTests}${colors ? RESET : ""}`);
     results.appendLine(`${colors ? RED : ""}Failed: ${this.failedTests}${colors ? RESET : ""}`);
 
