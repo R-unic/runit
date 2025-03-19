@@ -1,5 +1,5 @@
 import { Modding } from "@flamework/core";
-import { Range, RangeJSON } from "@rbxts/range";
+import { Range, type RangeJSON } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
 
 type ClassType<T = object, Args extends unknown[] = never[]> = {
