@@ -2,11 +2,10 @@ import { Reflect } from "@flamework/core";
 import { Constructor } from "@flamework/core/out/utility";
 import { StringBuilder } from "@rbxts/string-builder";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
-import { flatten, reverse } from "@rbxts/array-utils";
 import Object from "@rbxts/object-utils";
 import repr from "@rbxts/repr";
 
-import { type Maybe, Meta } from "./common";
+import { Meta } from "./common";
 
 type TestClassInstance = Record<string, Callback>;
 type TestClassConstructor = Constructor<TestClassInstance>;
@@ -37,13 +36,7 @@ class TestRunner {
   private passedTests = 0;
 
   public constructor(...roots: Instance[]) {
-    const modules = flatten(roots.map(root => getDescendantsOfType(root, "ModuleScript")));
-    for (const module of modules) {
-      const TestClass = <TestClassConstructor>require(module);
-      // (<any>TestClass).__moduleInstance = module;
-      // (<any>TestClass).__isNested = module.Parent !== undefined && !roots.includes(module.Parent);
-      this.addClass(TestClass)
-    }
+    this.loadModules(roots);
   }
 
   /**
@@ -73,18 +66,19 @@ class TestRunner {
   }
 
   private async runTestClass(TestClass: TestClassConstructor, testClass: TestClassInstance): Promise<void> {
-    const properties = Reflect.getProperties(TestClass);
-    const factNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Fact, property));
-    const theoryNames = properties.filter(property => Reflect.hasMetadata(TestClass, Meta.Theory, property));
+    const factNames: string[] = [];
+    const theoryNames: string[] = [];
+
+    for (const property of Reflect.getProperties(TestClass)) {
+      if (Reflect.hasMetadata(TestClass, Meta.Fact, property))
+        factNames.push(property);
+      else if (Reflect.hasMetadata(TestClass, Meta.Theory, property))
+        theoryNames.push(property);
+    }
 
     const addResult = (name: string, result: TestCaseResult) => {
-      let classResults = this.results.get(TestClass);
-      if (classResults === undefined)
-        classResults = this.results.set(TestClass, {}).get(TestClass)!;
-
-      const results = classResults[name] ?? [];
-      results.push(result);
-      classResults[name] = results;
+      const classResults = this.results.get(TestClass) ?? this.results.set(TestClass, {}).get(TestClass)!;
+      (classResults[name] ??= []).push(result);
     };
     const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
       this.failedTests++;
@@ -106,13 +100,11 @@ class TestRunner {
       try {
         await testCase(testClass, ...args ?? []);
       } catch (e) {
-        const timeElapsed = os.clock() - start;
-        fail(e, name, { timeElapsed, inputs: args });
+        fail(e, name, { timeElapsed: os.clock() - start, inputs: args });
         return false;
       }
 
-      const timeElapsed = os.clock() - start;
-      pass(name, { timeElapsed, inputs: args });
+      pass(name, { timeElapsed: os.clock() - start, inputs: args });
       return true;
     };
 
@@ -122,13 +114,15 @@ class TestRunner {
     }
 
     for (const theoryName of theoryNames) {
-      const testCases = <Maybe<unknown[][]>>Reflect.getMetadata(TestClass, Meta.TestData, theoryName);
+      const testCases = Reflect.getMetadata<unknown[][]>(TestClass, Meta.TestData, theoryName);
       if (testCases === undefined)
         throw `No data was provided to Theory test "${theoryName}"`;
 
       const theory = testClass[theoryName];
-      for (const args of reverse(testCases))
+      for (const i of $range(testCases.size() - 1, 0)) {
+        const args = testCases[i];
         if (!await runTestCase(theory, theoryName, args)) continue;
+      }
     }
   }
 
@@ -145,9 +139,8 @@ class TestRunner {
       const testResults = Object.entries(testResultRecord);
       const allPassed = testResults
         .every(([_, cases]) => cases.every(({ errorMessage }) => errorMessage === undefined));
-      const totalTime = testResults
-        .map(([_, cases]) => cases.map(result => result.timeElapsed).reduce((sum, n) => sum + n))
-        .reduce((sum, n) => sum + n);
+      const totalTime = testResults.reduce((sum, [_, cases]) =>
+        sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0), 0);
 
       results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${math.round(totalTime * 1000)}ms)`);
       indent++;
@@ -218,10 +211,16 @@ class TestRunner {
     return results.toString();
   }
 
-  private formatInputs(inputs: unknown[] | undefined) {
+  private formatInputs(inputs: unknown[] | undefined): string {
     return inputs !== undefined ?
-      (<defined[]>inputs).map(v => repr(v, { pretty: false })).join(", ")
+      (inputs as defined[]).map(v => repr(v, { pretty: false })).join(", ")
       : "";
+  }
+
+  private loadModules(roots: Instance[]): void {
+    for (const root of roots)
+      for (const module of getDescendantsOfType(root, "ModuleScript"))
+        this.addClass(require(module) as TestClassConstructor);
   }
 }
 

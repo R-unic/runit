@@ -1,5 +1,5 @@
 import { Modding, Reflect } from "@flamework/core";
-import { type Maybe, Errors, Meta } from "./common";
+import { Errors, Meta } from "./common";
 
 export function Fact<T extends object>(ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: void[]) => void>): void {
   if (Reflect.hasMetadata(ctor, Meta.TestData))
@@ -22,7 +22,7 @@ export function InlineData<T extends object, Args extends unknown[]>(...args: Ar
     if (Reflect.hasMetadata(ctor, Meta.Fact))
       throw Errors.UnexpectedData;
 
-    const dataMeta = <Maybe<unknown[][]>>Reflect.getMetadata(ctor, Meta.TestData, propertyKey) ?? [];
+    const dataMeta = Reflect.getMetadata<unknown[][]>(ctor, Meta.TestData, propertyKey) ?? [];
     dataMeta.push(args);
 
     Reflect.defineMetadata(ctor, Meta.TestData, dataMeta, propertyKey);
