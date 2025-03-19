@@ -1,7 +1,6 @@
 import { Modding } from "@flamework/core";
 import { Range } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
-import { t } from "@rbxts/t";
 
 type ClassType<T = object, Args extends unknown[] = never[]> = {
   new(...args: Args): T;
@@ -39,7 +38,7 @@ class AssertionFailedException {
 
 class Assert {
   public static propertyEqual(object: object, property: string, expectedValue: unknown): void {
-    const value = (<Record<string, unknown>>object)[property];
+    const value = (object as Record<string, unknown>)[property];
     if (value === expectedValue) return;
     throw new AssertionFailedException(`Expected object property "${property}" to be ${expectedValue}, got ${value}`);
   }
@@ -66,7 +65,7 @@ class Assert {
       .catch((e: unknown) => {
         thrown = e;
         exceptionThrown = exception !== undefined && typeOf(exception) === "string"
-          ? e === exception || e instanceof <ClassType>exception
+          ? e === exception || e instanceof (exception as ClassType)
           : true;
       });
 
@@ -92,11 +91,7 @@ class Assert {
     } catch (e) {
       thrown = e;
       if (exception !== undefined) {
-        if (typeOf(exception) === "string") {
-          if (e === exception) return;
-        } else {
-          if (exception instanceof <ClassType>exception) return;
-        }
+        if (e === exception || e instanceof (exception as ClassType)) return;
       } else
         return;
     }
@@ -157,17 +152,17 @@ class Assert {
   public static inRange(number: number, minimum: number, maximum: number): void
   public static inRange(number: number, minimum: number | Range, maximum?: number): void {
     if (typeOf(minimum) === "number") {
-      if (number >= <number>minimum && number <= maximum!) return;
+      if (number >= (minimum as number) && number <= maximum!) return;
       throw new AssertionFailedException(`${minimum}-${maximum}`, number);
     } else {
-      const range = <Range>minimum;
+      const range = minimum as Range;
       if (!range.isNumberWithin(number)) return;
       throw new AssertionFailedException(range.toString(), number);
     }
   }
 
   /** @metadata macro */
-  public static isType<Expected>(value: unknown, guard?: t.check<Expected> | Modding.Generic<Expected, "guard">): value is Expected {
+  public static isType<Expected>(value: unknown, guard?: ((value: unknown) => value is Expected) | Modding.Generic<Expected, "guard">): value is Expected {
     const matches = guard?.(value) ?? false;
     if (matches) return true;
 
