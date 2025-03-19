@@ -29,6 +29,22 @@ const DEFAULT_TEST_RUN_OPTIONS: TestRunOptions = {
   colors: false
 };
 
+function formatTime(ms: number): string {
+  let unit = "ms";
+  let figure = ms;
+  if (ms >= 1000) {
+    figure /= 1000;
+    unit = "s";
+  } else if (ms >= 1) {
+
+  } else if (ms >= 0.001) {
+    figure *= 1000;
+    unit = "µs";
+  }
+
+  return math.round(figure) + unit;
+}
+
 class TestRunner {
   private readonly testClasses: [TestClassConstructor, TestClassInstance][] = [];
   private results = new Map<Constructor, Record<string, TestCaseResult[]>>;
@@ -57,11 +73,11 @@ class TestRunner {
     });
 
     const { reporter, colors }: TestRunOptions = Object.assign({}, DEFAULT_TEST_RUN_OPTIONS, options);
-    const start = os.clock();
+    const start = os.clock() * 1000;
     for (const [TestClass, testClass] of this.testClasses)
       await this.runTestClass(TestClass, testClass);
 
-    const elapsedTime = os.clock() - start;
+    const elapsedTime = os.clock() * 1000 - start;
     reporter(this.generateOutput(elapsedTime, colors));
   }
 
@@ -96,15 +112,15 @@ class TestRunner {
       });
     };
     const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
-      const start = os.clock();
+      const start = os.clock() * 1000;
       try {
         await testCase(testClass, ...args ?? []);
       } catch (e) {
-        fail(e, name, { timeElapsed: os.clock() - start, inputs: args });
+        fail(e, name, { timeElapsed: os.clock() * 1000 - start, inputs: args });
         return false;
       }
 
-      pass(name, { timeElapsed: os.clock() - start, inputs: args });
+      pass(name, { timeElapsed: os.clock() * 1000 - start, inputs: args });
       return true;
     };
 
@@ -142,21 +158,21 @@ class TestRunner {
       const totalTime = testResults.reduce((sum, [_, cases]) =>
         sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0), 0);
 
-      results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${math.round(totalTime * 1000)}ms)`);
+      results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${formatTime(totalTime)})`);
       indent++;
 
       for (const testResult of testResults) {
         const [testCaseName, cases] = testResult;
         const totalElapsed = testResults
           .filter(([name]) => name === testCaseName)
-          .map(([_, cases]) => cases.map(result => result.timeElapsed).reduce((sum, n) => sum + n))
-          .reduce((sum, n) => sum + n);
+          .reduce((sum, [_, cases]) =>
+            sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0), 0);
 
         const allPassed = cases.every(({ errorMessage }) => errorMessage === undefined);
         const isLast = testResults.indexOf(testResult) === testResults.size() - 1;
         const hasInputs = cases.size() > 0 && cases[0].inputs !== undefined;
         appendIndent();
-        results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${math.round(totalElapsed * 1000)}ms)`);
+        results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${formatTime(totalElapsed)})`);
 
         if (hasInputs) {
           indent++;
@@ -169,7 +185,7 @@ class TestRunner {
             indent++;
             results.append("│");
             appendIndent();
-            results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${math.round(timeElapsed * 1000)}ms)`);
+            results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${formatTime(timeElapsed)}ms)`);
           }
           indent--;
         }
@@ -204,7 +220,7 @@ class TestRunner {
 
     const totalTests = this.passedTests + this.failedTests;
     results.appendLine("");
-    results.appendLine(`Ran ${totalTests} tests in ${math.round(elapsedTime * 1000)}ms`);
+    results.appendLine(`Ran ${totalTests} tests in ${formatTime(elapsedTime)}ms`);
     results.appendLine(`${colors ? GREEN : ""}Passed: ${this.passedTests}${colors ? RESET : ""}`);
     results.appendLine(`${colors ? RED : ""}Failed: ${this.failedTests}${colors ? RESET : ""}`);
 
