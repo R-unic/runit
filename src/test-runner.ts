@@ -135,7 +135,7 @@ class TestRunner {
         throw `No data was provided to Theory test "${theoryName}"`;
 
       const theory = testClass[theoryName];
-      for (const i of $range(testCases.size() - 1, 0)) {
+      for (const i of $range(testCases.size() - 1, 0, -1)) {
         const args = testCases[i];
         if (!await runTestCase(theory, theoryName, args)) continue;
       }
@@ -220,7 +220,7 @@ class TestRunner {
 
     const totalTests = this.passedTests + this.failedTests;
     results.appendLine("");
-    results.appendLine(`Ran ${totalTests} tests in ${formatTime(elapsedTime)}`);
+    results.appendLine(`Ran ${totalTests} test${totalTests !== 1 ? "s" : ""} in ${formatTime(elapsedTime)}`);
     results.appendLine(`${colors ? GREEN : ""}Passed: ${this.passedTests}${colors ? RESET : ""}`);
     results.appendLine(`${colors ? RED : ""}Failed: ${this.failedTests}${colors ? RESET : ""}`);
 
