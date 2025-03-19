@@ -19,8 +19,8 @@ class AssertionFailedException {
     error(this.toString(), 5);
   }
 
-  public static multipleFailures(totalItems: number, errors: [number, string, string][]): AssertionFailedException {
-    const message = `Assert.all() failure: ${errors.size()} of ${totalItems} items in the collection did not pass\n` +
+  public static multipleFailures(methodName: string, totalItems: number, errors: [number, string, string][]): AssertionFailedException {
+    const message = `Assert.${methodName}() failure: ${errors.size()} of ${totalItems} items in the collection did not pass\n` +
       errors
         .map(([index, element, err]) =>
           `${index}     ${element}\n` +
@@ -99,21 +99,38 @@ class Assert {
     throw new AssertionFailedException(`Expected method to throw${exception !== undefined ? ' "' + tostring(exception) + `", threw "${thrown}"` : ""}`);
   }
 
-  public static all<T extends defined>(array: T[], predicate: (element: T) => void): void {
+  public static all<T extends defined>(array: T[], predicate: (element: T, index: number) => void): void {
     const errors: [number, string, string][] = [];
-    let count = 0;
+    let index = 0;
 
     for (const element of array) {
       try {
-        predicate(element);
+        predicate(element, index);
       } catch (e) {
-        errors.push([count, tostring(element), tostring(e)]);
+        errors.push([index, tostring(element), tostring(e)]);
       }
-      count++;
+      index++;
     }
 
     if (errors.size() > 0)
-      throw AssertionFailedException.multipleFailures(count, errors);
+      throw AssertionFailedException.multipleFailures("all", index, errors);
+  }
+
+  public static any<T extends defined>(array: T[], predicate: (element: T, index: number) => void): void {
+    const errors: [number, string, string][] = [];
+    let index = 0;
+
+    for (const element of array) {
+      try {
+        predicate(element, index);
+      } catch (e) {
+        errors.push([index, tostring(element), tostring(e)]);
+      }
+      index++;
+    }
+
+    if (errors.size() === array.size())
+      throw AssertionFailedException.multipleFailures("any", index, errors);
   }
 
   public static doesNotContain<T extends defined>(element: T, array: T[]): void {
