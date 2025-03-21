@@ -31,8 +31,5 @@
         "obfuscation": false
       }
     ]
-  },
-  "exclude": [
-    "dev"
-  ]
+  }
 }

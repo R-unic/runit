@@ -1,7 +1,7 @@
 import { Reflect } from "@flamework/core";
 import { Constructor } from "@flamework/core/out/utility";
-import { StringBuilder } from "@rbxts/string-builder";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
+import StringBuilder from "@rbxts/string-builder";
 import Object from "@rbxts/object-utils";
 import repr from "@rbxts/repr";
 
