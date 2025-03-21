@@ -169,23 +169,23 @@ class TestRunner {
             sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0), 0);
 
         const allPassed = cases.every(({ errorMessage }) => errorMessage === undefined);
-        const isLast = testResults.indexOf(testResult) === testResults.size() - 1;
+        const isLastResult = testResults.indexOf(testResult) === testResults.size() - 1;
         const hasInputs = cases.size() > 0 && cases[0].inputs !== undefined;
         appendIndent();
-        results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${formatTime(totalElapsed)})`);
+        results.appendLine(`${isLastResult ? "└" : "├"}── [${getSymbol(allPassed)}] ${testCaseName} (${formatTime(totalElapsed)})`);
 
         if (hasInputs) {
           indent++;
           for (const testCase of cases) {
             const { errorMessage, timeElapsed, inputs } = testCase;
-            const isLast = cases.indexOf(testCase) === cases.size() - 1;
+            const isLastCase = cases.indexOf(testCase) === cases.size() - 1;
             const passed = errorMessage === undefined;
             indent--;
             appendIndent();
             indent++;
-            results.append(isLast ? "│" : " ");
+            results.append(isLastResult ? "│" : " ");
             appendIndent();
-            results.appendLine(`${isLast ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${formatTime(timeElapsed)})`);
+            results.appendLine(`${isLastCase ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${formatTime(timeElapsed)})`);
           }
           indent--;
         }
