@@ -1,6 +1,6 @@
 export const enum Errors {
   NotBoth = "[Runit]: A method cannot be marked as both a Fact and a Theory",
-  UnexpectedData = "[Runit]: InlineData and DynamicData can only be used on Theories"
+  UnexpectedData = "[Runit]: InlineData can only be used on Theories"
 }
 
 export const enum Meta {

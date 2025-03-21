@@ -209,6 +209,7 @@ class Assert {
   }
 
   public static undefined(value: unknown): void {
+    if (value === undefined) return;
     this.equal(undefined, value);
   }
 
