@@ -183,7 +183,7 @@ class TestRunner {
             indent--;
             appendIndent();
             indent++;
-            results.append(isLastResult ? "│" : " ");
+            results.append(isLastResult ? " " : "│");
             appendIndent();
             results.appendLine(`${isLastCase ? "└" : "├"}── [${getSymbol(passed)}] ${this.formatInputs(inputs)} (${formatTime(timeElapsed)})`);
           }
