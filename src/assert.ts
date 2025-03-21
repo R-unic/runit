@@ -56,21 +56,23 @@ class Assert {
   }
 
   public static throwsAsync(method: () => Promise<void>): void
-  public static throwsAsync(method: () => Promise<void>, exception: string): void
-  public static async throwsAsync(method: () => Promise<void>, exception?: string | ClassType): Promise<void> {
+  public static throwsAsync(method: () => Promise<void>, expectedException: string): void
+  public static async throwsAsync(method: () => Promise<void>, expectedException?: string | ClassType): Promise<void> {
     let exceptionThrown = false;
     let thrown: unknown = undefined;
 
     await method()
       .catch((e: unknown) => {
         thrown = e;
-        exceptionThrown = exception !== undefined && typeOf(exception) === "string"
-          ? e === exception || e instanceof (exception as ClassType)
+        exceptionThrown = expectedException !== undefined && typeOf(expectedException) === "string"
+          ? typeOf(expectedException) === "string"
+            ? startsWith(tostring(e), expectedException as string) || endsWith(tostring(e), expectedException as string)
+            : e instanceof (expectedException as ClassType)
           : true;
       });
 
     if (exceptionThrown) return;
-    throw new AssertionFailedException(`Expected async method to throw${exception !== undefined ? `\nExpected: ${tostring(exception)}\nActual: ${thrown}` : ""}`);
+    throw new AssertionFailedException(`Expected async method to throw${expectedException !== undefined ? `\nExpected: ${tostring(expectedException)}\nActual: ${thrown}` : ""}`);
   }
 
   public static doesNotThrow(method: () => void): void {
@@ -82,21 +84,21 @@ class Assert {
   }
 
   public static throws(method: () => void): void
-  public static throws(method: () => void, exception: string): void
-  public static throws(method: () => void, exception?: string | ClassType): void {
-    let thrown: unknown = undefined;
+  public static throws(method: () => void, expectedException: string | ClassType): void
+  public static throws(method: () => void, expectedException?: string | ClassType): void {
+    let thrown: unknown;
 
     try {
       method();
     } catch (e) {
       thrown = e;
-      if (exception !== undefined) {
-        if (e === exception || e instanceof (exception as ClassType)) return;
+      if (expectedException !== undefined) {
+        if (typeOf(expectedException) === "string" ? startsWith(tostring(e), expectedException as string) || endsWith(tostring(e), expectedException as string) : e instanceof (expectedException as ClassType)) return;
       } else
         return;
     }
 
-    throw new AssertionFailedException(`Expected method to throw${exception !== undefined ? ' "' + tostring(exception) + `", threw "${thrown}"` : ""}`);
+    throw new AssertionFailedException(`Expected method to throw${expectedException !== undefined ? ' "' + tostring(expectedException) + `", threw "${thrown}"` : ""}`);
   }
 
   public static all<T extends defined>(array: T[], predicate: (element: T, index: number) => void): void {
