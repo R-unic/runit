@@ -238,8 +238,10 @@ class TestRunner {
 
   private loadModules(roots: Instance[]): void {
     for (const root of roots)
-      for (const module of getDescendantsOfType(root, "ModuleScript"))
+      for (const module of getDescendantsOfType(root, "ModuleScript")) {
+        if (module.Name.sub(-1) !== ".spec") continue;
         this.addClass(require(module) as TestClassConstructor);
+      }
   }
 }
 
