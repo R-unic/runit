@@ -54,3 +54,15 @@ class NumberUtilityTest {
 
 export = NumberUtilityTest;
 ```
+
+## Setup/Teardown
+Setup can be done via the constructor. Teardown is done using the `destroy` method, which is automatically called after all tests have completed.
+```ts
+class MyTest {
+  private readonly junk = new Junk;
+
+  public destroy(): void {
+    this.junk.destroy();
+  }
+}
+```

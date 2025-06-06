@@ -59,8 +59,7 @@ class TestRunner {
    * Adds a test class. The class is instantiated when it is added, and any functions on the class are considered tests.
    * The order that the tests are run in is determined by the value provided to the \@Order decorator on the class.
    */
-  public addClass(ctor: Constructor): void {
-    const TestClass = <TestClassConstructor>ctor
+  public addClass(TestClass: TestClassConstructor): void {
     this.testClasses.push([TestClass, new TestClass]);
   }
 
@@ -76,6 +75,10 @@ class TestRunner {
     const start = os.clock() * 1000;
     for (const [TestClass, testClass] of this.testClasses)
       await this.runTestClass(TestClass, testClass);
+
+    for (const [_, testClass] of this.testClasses)
+      if ("destroy" in testClass && typeIs(testClass.destroy, "function"))
+        testClass.destroy();
 
     const elapsedTime = os.clock() * 1000 - start;
     reporter(this.generateOutput(elapsedTime, colors));
