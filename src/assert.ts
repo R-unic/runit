@@ -202,20 +202,20 @@ class Assert {
     throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`);
   }
 
-  public static true(value: unknown): void {
+  public static true(value: unknown): asserts value is true {
     this.equal(true, value);
   }
 
-  public static false(value: unknown): void {
+  public static false(value: unknown): asserts value is false {
     this.equal(false, value);
   }
 
-  public static undefined(value: unknown): void {
+  public static undefined(value: unknown): asserts value is undefined {
     if (value === undefined) return;
     this.equal(undefined, value);
   }
 
-  public static notUndefined(value: unknown): void {
+  public static defined(value: unknown): asserts value is defined {
     if (value !== undefined) return;
     throw new AssertionFailedException("Expected value to not be undefined");
   }
