@@ -246,7 +246,7 @@ class Assert {
     });
   }
 
-  public appendFailedMessage(message: string, runner: () => void) {
+  public static appendFailedMessage(message: string, runner: () => void): void {
     try {
       runner();
     } catch (e) {
