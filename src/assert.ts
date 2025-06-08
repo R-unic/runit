@@ -154,8 +154,29 @@ class Assert {
   }
 
   public static empty(array: defined[]): void {
-    if (array.size() === 0) return;
-    throw new AssertionFailedException("Expected array to be empty");
+    const size = array.size();
+    if (size === 0) return;
+    throw new AssertionFailedException(`Expected array to be empty\nActual length: ${size}`);
+  }
+
+  public static notEmpty(array: defined[]): void {
+    if (array.size() > 0) return;
+    throw new AssertionFailedException("Expected array not to be empty");
+  }
+
+  public static single(array: defined[]): void {
+    const size = array.size();
+    if (size === 1) return;
+    throw new AssertionFailedException(`Expected array to have one element\nActual length: ${size}`);
+  }
+
+  public static count(expectedLength: number, collection: Map<unknown, unknown>): void;
+  public static count(expectedLength: number, collection: Set<unknown>): void;
+  public static count(expectedLength: number, collection: unknown[]): void;
+  public static count(expectedLength: number, collection: unknown[] | Set<unknown> | Map<unknown, unknown>): void {
+    const actualLength = (collection as Set<unknown>).size();
+    if (expectedLength === actualLength) return;
+    throw new AssertionFailedException(`Expected collection ${collection} to be of length ${expectedLength}\nActual length: ${actualLength}`);
   }
 
   public static startsWith(str: string, substring: string): void {
@@ -201,15 +222,6 @@ class Assert {
 
     if (value instanceof <ClassType>expectedType) return;
     throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`);
-  }
-
-  public static count(expectedLength: number, collection: Map<unknown, unknown>): void;
-  public static count(expectedLength: number, collection: Set<unknown>): void;
-  public static count(expectedLength: number, collection: unknown[]): void;
-  public static count(expectedLength: number, collection: unknown[] | Set<unknown> | Map<unknown, unknown>): void {
-    const actualLength = (collection as Set<unknown>).size();
-    if (expectedLength === actualLength) return;
-    throw new AssertionFailedException(`Expected collection ${collection} to be of length ${expectedLength}\nActual length: ${actualLength}`);
   }
 
   public static true(value: unknown): asserts value is true {
