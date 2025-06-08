@@ -203,6 +203,15 @@ class Assert {
     throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`);
   }
 
+  public static count(expectedLength: number, collection: Map<unknown, unknown>): void;
+  public static count(expectedLength: number, collection: Set<unknown>): void;
+  public static count(expectedLength: number, collection: unknown[]): void;
+  public static count(expectedLength: number, collection: unknown[] | Set<unknown> | Map<unknown, unknown>): void {
+    const actualLength = (collection as Set<unknown>).size();
+    if (expectedLength === actualLength) return;
+    throw new AssertionFailedException(`Expected collection ${collection} to be of length ${expectedLength}\nActual length: ${actualLength}`);
+  }
+
   public static true(value: unknown): asserts value is true {
     this.equal(true, value);
   }
