@@ -76,11 +76,11 @@ class TestRunner {
     for (const [TestClass, testClass] of this.testClasses)
       await this.runTestClass(TestClass, testClass);
 
+    const elapsedTime = os.clock() * 1000 - start;
     for (const [_, testClass] of this.testClasses)
       if ("destroy" in testClass && typeIs(testClass.destroy, "function"))
         testClass.destroy();
 
-    const elapsedTime = os.clock() * 1000 - start;
     reporter(this.generateOutput(elapsedTime, colors));
   }
 
@@ -127,9 +127,10 @@ class TestRunner {
       return true;
     };
 
+    const promises: Promise<boolean>[] = []
     for (const factName of factNames) {
       const fact = testClass[factName];
-      if (!await runTestCase(fact, factName)) continue;
+      promises.push(runTestCase(fact, factName));
     }
 
     for (const theoryName of theoryNames) {
@@ -140,9 +141,11 @@ class TestRunner {
       const theory = testClass[theoryName];
       for (const i of $range(testCases.size() - 1, 0, -1)) {
         const args = testCases[i];
-        if (!await runTestCase(theory, theoryName, args)) continue;
+        promises.push(runTestCase(theory, theoryName, args));
       }
     }
+
+    return void await Promise.all(promises);
   }
 
   private generateOutput(elapsedTime: number, colors: boolean): string {
@@ -150,16 +153,18 @@ class TestRunner {
     let indent = 0;
 
     const appendIndent = () => results.append("  ".rep(indent));
-    const getSymbol = (passed: boolean) => colors ?
-      (passed ? `${GREEN}+${RESET}` : `${RED}×${RESET}`)
+    const getSymbol = (passed: boolean) => colors
+      ? (passed ? `${GREEN}+${RESET}` : `${RED}×${RESET}`)
       : (passed ? "+" : "×");
 
     for (const [TestClass, testResultRecord] of pairs(this.results)) {
       const testResults = Object.entries(testResultRecord);
       const allPassed = testResults
         .every(([_, cases]) => cases.every(({ errorMessage }) => errorMessage === undefined));
-      const totalTime = testResults.reduce((sum, [_, cases]) =>
-        sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0), 0);
+      const totalTime = testResults.reduce(
+        (sum, [_, cases]) => sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0),
+        0
+      );
 
       results.appendLine(`[${getSymbol(allPassed)}] ${TestClass} (${formatTime(totalTime)})`);
       indent++;
@@ -168,8 +173,10 @@ class TestRunner {
         const [testCaseName, cases] = testResult;
         const totalElapsed = testResults
           .filter(([name]) => name === testCaseName)
-          .reduce((sum, [_, cases]) =>
-            sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0), 0);
+          .reduce(
+            (sum, [_, cases]) => sum + cases.reduce((acc, { timeElapsed }) => acc + timeElapsed, 0),
+            0
+          );
 
         const allPassed = cases.every(({ errorMessage }) => errorMessage === undefined);
         const isLastResult = testResults.indexOf(testResult) === testResults.size() - 1;
@@ -231,8 +238,8 @@ class TestRunner {
   }
 
   private formatInputs(inputs: unknown[] | undefined): string {
-    return inputs !== undefined ?
-      (inputs as defined[]).map(v => repr(v, { pretty: false })).join(", ")
+    return inputs !== undefined
+      ? (inputs as defined[]).map(v => repr(v, { pretty: false })).join(", ")
       : "";
   }
 

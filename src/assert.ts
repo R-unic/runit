@@ -227,7 +227,7 @@ class Assert {
     const near = offBy <= 0;
     if (near) return;
 
-    throw new AssertionFailedException(`Expected values to be nearly equal\nExpected:${expected}\nActual:${actual}\nOff By: ${offBy}`);
+    throw new AssertionFailedException(`Expected values to be nearly equal\nExpected: ${expected}\nActual: ${actual}\nOff By: ${offBy}`);
   }
 
   public static notEqual(expected: unknown, actual: unknown): void {
