@@ -1,4 +1,5 @@
 import { Modding } from "@flamework/core";
+import { Constructor } from "@flamework/core/out/utility";
 import { Range, type RangeJSON } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
 
@@ -220,6 +221,15 @@ class Assert {
     throw new AssertionFailedException("Expected value to not be undefined");
   }
 
+  public static fuzzyEqual(expected: number, actual: number, epsilon = 1e-6): void {
+    const difference = math.abs(expected - actual);
+    const offBy = difference - epsilon;
+    const near = offBy <= 0;
+    if (near) return;
+
+    throw new AssertionFailedException(`Expected values to be nearly equal\nExpected:${expected}\nActual:${actual}\nOff By: ${offBy}`);
+  }
+
   public static notEqual(expected: unknown, actual: unknown): void {
     if (expected !== actual) return;
     throw new AssertionFailedException("Expected values to be inequal");
@@ -228,6 +238,23 @@ class Assert {
   public static equal(expected: unknown, actual: unknown): void {
     if (expected === actual) return;
     throw new AssertionFailedException(expected, actual);
+  }
+
+  public static custom(runner: (fail: ((message: string) => void) | ((expected: unknown, actual: unknown) => void)) => void): void {
+    runner((message, actual) => {
+      throw new AssertionFailedException(message, actual)
+    });
+  }
+
+  public appendFailedMessage(message: string, runner: () => void) {
+    try {
+      runner();
+    } catch (e) {
+      if (e instanceof AssertionFailedException)
+        (e as Writable<AssertionFailedException>).message = `${message}\n${e.message}`;
+
+      throw e;
+    }
   }
 }
 
