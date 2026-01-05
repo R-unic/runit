@@ -1,5 +1,4 @@
 import { Modding } from "@flamework/core";
-import { Constructor } from "@flamework/core/out/utility";
 import { Range, type RangeJSON } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
 
@@ -7,20 +6,27 @@ type ClassType<T = object, Args extends unknown[] = never[]> = {
   new(...args: Args): T;
 }
 
+type CallsiteMetadata = Modding.CallerMany<"line" | "character">;
+
+interface IsTypeMetadata<T> {
+  readonly text: Modding.Generic<T, "text">;
+  readonly callsiteMeta: CallsiteMetadata;
+}
+
 class AssertionFailedException {
   public readonly message: string;
 
-  public constructor(expected: unknown, actual: unknown);
-  public constructor(message: string);
-  public constructor(
-    message: unknown,
-    actual?: unknown
-  ) {
-    this.message = actual !== undefined ? `Expected: ${message}\nActual: ${actual}` : <string>message;
-    error(this.toString(), 5);
+  public constructor(message: string, meta?: CallsiteMetadata) {
+    const metaText = meta !== undefined ? `[${meta?.line}:${meta?.character}]` : "";
+    this.message = tostring(metaText + message);
+    error(this.toString(), 0);
   }
 
-  public static multipleFailures(methodName: string, totalItems: number, errors: [number, string, string][]): AssertionFailedException {
+  public static equality(expected: unknown, actual: unknown, meta?: CallsiteMetadata): AssertionFailedException {
+    return new AssertionFailedException(`Expected: ${expected}\nActual: ${actual}`, meta);
+  }
+
+  public static multipleFailures(methodName: string, totalItems: number, errors: [number, string, string][], meta?: CallsiteMetadata): AssertionFailedException {
     const message = `Assert.${methodName}() failure: ${errors.size()} of ${totalItems} items in the collection did not pass\n` +
       errors
         .map(([index, element, err]) =>
@@ -29,7 +35,7 @@ class AssertionFailedException {
         )
         .join("\n");
 
-    return new AssertionFailedException(message);
+    return new AssertionFailedException(message, meta);
   }
 
   public toString(): string {
@@ -38,21 +44,24 @@ class AssertionFailedException {
 }
 
 class Assert {
-  public static propertyEqual(object: object, property: string, expectedValue: unknown): void {
-    const value = (object as Record<string, unknown>)[property];
+  /** @metadata macro */
+  public static propertyEqual<T>(object: T, property: keyof T, expectedValue: unknown, meta?: CallsiteMetadata): void {
+    const value = object[property];
     if (value === expectedValue) return;
-    throw new AssertionFailedException(`Expected object property "${property}" to be ${expectedValue}, got ${value}`);
+    throw new AssertionFailedException(`Expected object property "${tostring(property)}" to be ${expectedValue}, got ${value}`, meta);
   }
 
-  public static hasProperty(object: object, property: string): void {
+  /** @metadata macro */
+  public static hasProperty(object: object, property: string, meta?: CallsiteMetadata): void {
     if (property in object) return;
-    throw new AssertionFailedException(`Expected object to have property "${property}"`);
+    throw new AssertionFailedException(`Expected object to have property "${property}"`, meta);
   }
 
-  public static async doesNotThrowAsync(method: () => Promise<void>): Promise<void> {
+  /** @metadata macro */
+  public static async doesNotThrowAsync(method: () => Promise<void>, meta?: CallsiteMetadata): Promise<void> {
     await method()
       .catch(e => {
-        throw new AssertionFailedException(`Expected async method not to throw, threw:\n${e}`);
+        throw new AssertionFailedException(`Expected async method not to throw, threw:\n${e}`, meta);
       });
   }
 
@@ -76,11 +85,12 @@ class Assert {
     throw new AssertionFailedException(`Expected async method to throw${expectedException !== undefined ? `\nExpected: ${tostring(expectedException)}\nActual: ${thrown}` : ""}`);
   }
 
-  public static doesNotThrow(method: () => void): void {
+  /** @metadata macro */
+  public static doesNotThrow(method: () => void, meta?: CallsiteMetadata): void {
     try {
       method();
     } catch (e) {
-      throw new AssertionFailedException(`Expected method not to throw, threw:\n${e}`);
+      throw new AssertionFailedException(`Expected method not to throw, threw:\n${e}`, meta);
     }
   }
 
@@ -102,7 +112,8 @@ class Assert {
     throw new AssertionFailedException(`Expected method to throw${expectedException !== undefined ? ' "' + tostring(expectedException) + `", threw "${thrown}"` : ""}`);
   }
 
-  public static all<T extends defined>(array: T[], predicate: (element: T, index: number) => void): void {
+  /** @metadata macro */
+  public static all<T extends defined>(array: T[], predicate: (element: T, index: number) => void, meta?: CallsiteMetadata): void {
     const errors: [number, string, string][] = [];
     let index = 0;
 
@@ -116,10 +127,11 @@ class Assert {
     }
 
     if (errors.size() > 0)
-      throw AssertionFailedException.multipleFailures("all", index, errors);
+      throw AssertionFailedException.multipleFailures("all", index, errors, meta);
   }
 
-  public static any<T extends defined>(array: T[], predicate: (element: T, index: number) => void): void {
+  /** @metadata macro */
+  public static any<T extends defined>(array: T[], predicate: (element: T, index: number) => void, meta?: CallsiteMetadata): void {
     const errors: [number, string, string][] = [];
     let index = 0;
 
@@ -133,60 +145,73 @@ class Assert {
     }
 
     if (errors.size() === array.size())
-      throw AssertionFailedException.multipleFailures("any", index, errors);
+      throw AssertionFailedException.multipleFailures("any", index, errors, meta);
   }
 
-  public static doesNotContain<T extends defined>(element: T, array: T[]): void {
+  /** @metadata macro */
+  public static doesNotContain<T extends defined>(element: T, array: T[], meta?: CallsiteMetadata): void {
     if (!array.includes(element)) return;
     throw new AssertionFailedException(`Expected array to not contain element "${array}"`);
   }
 
-  public static contains<T extends defined>(expectedElement: T, array: T[]): void
-  public static contains<T extends defined>(array: T[], predicate: (element: T) => boolean): void
-  public static contains<T extends defined>(array: T[] | T, predicate: T[] | ((element: T) => boolean)): void {
+  /** @metadata macro */
+  public static contains<T extends defined>(expectedElement: T, array: T[], meta?: CallsiteMetadata): void
+  /** @metadata macro */
+  public static contains<T extends defined>(array: T[], predicate: (element: T) => boolean, meta?: CallsiteMetadata): void
+  /** @metadata macro */
+  public static contains<T extends defined>(array: T[] | T, predicate: T[] | ((element: T) => boolean), meta?: CallsiteMetadata): void {
     if (typeOf(predicate) === "function") {
       if ((<T[]>array).some(<(element: T) => boolean>predicate)) return;
-      throw new AssertionFailedException("Expected array to contain elements matching the predicate");
+      throw new AssertionFailedException("Expected array to contain elements matching the predicate", meta);
     } else {
       if ((<T[]>predicate).includes(<T>array)) return;
-      throw new AssertionFailedException(`Expected array to contain element "${array}"`);
+      throw new AssertionFailedException(`Expected array to contain element "${array}"`, meta);
     }
   }
 
-  public static empty(array: defined[]): void {
+  /** @metadata macro */
+  public static empty(array: defined[], meta?: CallsiteMetadata): void {
     const size = array.size();
     if (size === 0) return;
-    throw new AssertionFailedException(`Expected array to be empty\nActual length: ${size}`);
+    throw new AssertionFailedException(`Expected array to be empty\nActual length: ${size}`, meta);
   }
 
-  public static notEmpty(array: defined[]): void {
+  /** @metadata macro */
+  public static notEmpty(array: defined[], meta?: CallsiteMetadata): void {
     if (array.size() > 0) return;
-    throw new AssertionFailedException("Expected array not to be empty");
+    throw new AssertionFailedException("Expected array not to be empty", meta);
   }
 
-  public static single(array: defined[]): void {
+  /** @metadata macro */
+  public static single(array: defined[], meta?: CallsiteMetadata): void {
     const size = array.size();
     if (size === 1) return;
-    throw new AssertionFailedException(`Expected array to have one element\nActual length: ${size}`);
+    throw new AssertionFailedException(`Expected array to have one element\nActual length: ${size}`, meta);
   }
 
-  public static count(expectedLength: number, collection: Map<unknown, unknown>): void;
-  public static count(expectedLength: number, collection: Set<unknown>): void;
-  public static count(expectedLength: number, collection: unknown[]): void;
-  public static count(expectedLength: number, collection: unknown[] | Set<unknown> | Map<unknown, unknown>): void {
+  /** @metadata macro */
+  public static count(expectedLength: number, collection: Map<unknown, unknown>, meta?: CallsiteMetadata): void;
+  /** @metadata macro */
+  public static count(expectedLength: number, collection: Set<unknown>, meta?: CallsiteMetadata): void;
+  /** @metadata macro */
+  public static count(expectedLength: number, collection: unknown[], meta?: CallsiteMetadata): void;
+  /** @metadata macro */
+  public static count(expectedLength: number, collection: unknown[] | Set<unknown> | Map<unknown, unknown>, meta?: CallsiteMetadata): void {
     const actualLength = (collection as Set<unknown>).size();
     if (expectedLength === actualLength) return;
-    throw new AssertionFailedException(`Expected collection ${collection} to be of length ${expectedLength}\nActual length: ${actualLength}`);
+    throw new AssertionFailedException(`Expected collection ${collection} to be of length ${expectedLength}\nActual length: ${actualLength}`, meta);
   }
 
-  public static startsWith(str: string, substring: string): void {
+  /** @metadata macro */
+  public static startsWith(str: string, substring: string, meta?: CallsiteMetadata): void {
     if (startsWith(str, substring)) return
-    throw new AssertionFailedException(`Expected string "${str}" to start with substring "${substring}"`);
+    throw new AssertionFailedException(`Expected string "${str}" to start with substring "${substring}"`, meta);
   }
 
-  public static endsWith(str: string, substring: string): void {
+  /** @metadata macro */
+  public static endsWith(str: string, substring: string, meta?: CallsiteMetadata): void {
     if (endsWith(str, substring)) return
-    throw new AssertionFailedException(`Expected string "${str}" to end with substring "${substring}"`);
+    throw new AssertionFailedException(`Expected string "${str}" to end with substring "${substring}"`, meta);
   }
 
   public static inRange(number: number, range: RangeJSON): void
@@ -196,74 +221,86 @@ class Assert {
     const isNumber = (value: unknown): value is number => typeOf(minimum) === "number";
     if (isNumber(minimum)) {
       if (number >= (minimum as number) && number <= maximum!) return;
-      throw new AssertionFailedException(`${minimum}-${maximum}`, number);
+      throw AssertionFailedException.equality(`${minimum}-${maximum}`, number);
     } else {
       const range = minimum instanceof Range ? minimum : Range.fromJSON(minimum);
       if (!range.isNumberWithin(number)) return;
-      throw new AssertionFailedException(range.toString(), number);
+      throw AssertionFailedException.equality(range.toString(), number);
     }
   }
 
   /** @metadata macro */
-  public static isType<Expected>(value: unknown, guard?: ((value: unknown) => value is Expected) | Modding.Generic<Expected, "guard">): value is Expected {
+  public static isType<Expected>(
+    value: unknown,
+    guard?: ((value: unknown) => value is Expected) | Modding.Generic<Expected, "guard">,
+    meta?: IsTypeMetadata<Expected>
+  ): value is Expected {
     const matches = guard?.(value) ?? false;
     if (matches) return true;
 
-    // TODO: improve message using either @rbxts/reflect or rbxts-transform-debug
-    throw new AssertionFailedException(`Type did not pass the provided type guard ${guard}`);
+    throw new AssertionFailedException(`Type ${meta?.text ?? "???"} did not pass the provided type guard ${guard}`, meta?.callsiteMeta);
   }
 
-  public static isCheckableType(value: unknown, expectedType: keyof CheckableTypes | ClassType): void {
+  /** @metadata macro */
+  public static isCheckableType(value: unknown, expectedType: keyof CheckableTypes | ClassType, meta?: CallsiteMetadata): void {
     if (typeOf(expectedType) === "string") {
       const actualType = typeOf(value);
       if (actualType === expectedType) return;
-      throw new AssertionFailedException(`Expected type: ${expectedType}\nActual type: ${actualType}`);
+      throw new AssertionFailedException(`Expected type: ${expectedType}\nActual type: ${actualType}`, meta);
     }
 
     if (value instanceof <ClassType>expectedType) return;
-    throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`);
+    throw new AssertionFailedException(`Expected class type: ${expectedType}\nActual class type: ${typeOf(value) === "table" ? value : typeOf(value)}`, meta);
   }
 
-  public static true(value: unknown): asserts value is true {
-    this.equal(true, value);
+  /** @metadata macro */
+  public static true(value: unknown, meta?: CallsiteMetadata): asserts value is true {
+    this.equal(true, value, meta);
   }
 
-  public static false(value: unknown): asserts value is false {
-    this.equal(false, value);
+  /** @metadata macro */
+  public static false(value: unknown, meta?: CallsiteMetadata): asserts value is false {
+    this.equal(false, value, meta);
   }
 
-  public static undefined(value: unknown): asserts value is undefined {
+  /** @metadata macro */
+  public static undefined(value: unknown, meta?: CallsiteMetadata): asserts value is undefined {
     if (value === undefined) return;
-    this.equal(undefined, value);
+    this.equal(undefined, value, meta);
   }
 
-  public static defined(value: unknown): asserts value is defined {
+  /** @metadata macro */
+  public static defined(value: unknown, meta?: CallsiteMetadata): asserts value is defined {
     if (value !== undefined) return;
-    throw new AssertionFailedException("Expected value to not be undefined");
+    throw new AssertionFailedException("Expected value to not be undefined", meta);
   }
 
-  public static fuzzyEqual(expected: number, actual: number, epsilon = 1e-6): void {
+  /** @metadata macro */
+  public static fuzzyEqual(expected: number, actual: number, epsilon = 1e-6, meta?: CallsiteMetadata): void {
     const difference = math.abs(expected - actual);
     const offBy = difference - epsilon;
     const near = offBy <= 0;
     if (near) return;
 
-    throw new AssertionFailedException(`Expected values to be nearly equal\nExpected: ${expected}\nActual: ${actual}\nOff By: ${offBy}`);
+    throw new AssertionFailedException(`Expected values to be nearly equal\nExpected: ${expected}\nActual: ${actual}\nOff by: ${offBy}`, meta);
   }
 
-  public static notEqual(expected: unknown, actual: unknown): void {
+  /** @metadata macro */
+  public static notEqual(expected: unknown, actual: unknown, meta?: CallsiteMetadata): void {
     if (expected !== actual) return;
-    throw new AssertionFailedException("Expected values to be inequal");
+    throw new AssertionFailedException("Expected values to be inequal, got: " + actual, meta);
   }
 
-  public static equal(expected: unknown, actual: unknown): void {
+  /** @metadata macro */
+  public static equal(expected: unknown, actual: unknown, meta?: CallsiteMetadata): void {
     if (expected === actual) return;
-    throw new AssertionFailedException(expected, actual);
+    throw AssertionFailedException.equality(expected, actual, meta);
   }
 
-  public static custom(runner: (fail: ((message: string) => void) | ((expected: unknown, actual: unknown) => void)) => void): void {
+  /** @metadata macro */
+  public static custom(runner: (fail: ((message: string) => void) | ((expected: unknown, actual: unknown) => void)) => void, meta?: CallsiteMetadata): void {
     runner((message, actual) => {
-      throw new AssertionFailedException(message, actual)
+      throw AssertionFailedException.equality(message, actual, meta)
     });
   }
 

@@ -87,7 +87,6 @@ class TestRunner {
   private async runTestClass(TestClass: TestClassConstructor, testClass: TestClassInstance): Promise<void> {
     const factNames: string[] = [];
     const theoryNames: string[] = [];
-
     for (const property of Reflect.getProperties(TestClass)) {
       if (Reflect.hasMetadata(TestClass, Meta.Fact, property))
         factNames.push(property);
@@ -96,7 +95,8 @@ class TestRunner {
     }
 
     const addResult = (name: string, result: TestCaseResult) => {
-      const classResults = this.results.get(TestClass) ?? this.results.set(TestClass, {}).get(TestClass)!;
+      const classResults = this.results.get(TestClass) ?? this.results.set(TestClass, {}).get(TestClass);
+      assert(classResults !== undefined, "no test results record for class");
       (classResults[name] ??= []).push(result);
     };
     const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
