@@ -2,9 +2,12 @@
 ### pronounced "R Unit"
 A unit testing library for Roblox heavily inspired by xUnit from C#
 
+> [!CAUTION]
+> Depends on `rbxts-transformer-flamework`!
+
 ## Example
 
-src/scripts/run-tests.server.ts
+#### src/scripts/run-tests.server.ts
 ```ts
 import { TestRunner } from "@rbxts/runit";
 import { ServerScriptService } from "@rbxts/services";
@@ -16,7 +19,9 @@ const testRunner = new TestRunner(
 testRunner.run();
 ```
 
-src/tests/number-utility-test.ts
+#### src/tests/number-utility.spec.ts
+Test files must end in `.spec.ts`.
+
 ```ts
 import { Fact, Theory, InlineData, Assert } from "@rbxts/runit";
 
