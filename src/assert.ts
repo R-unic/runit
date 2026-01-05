@@ -14,11 +14,10 @@ interface IsTypeMetadata<T> {
 }
 
 class AssertionFailedException {
-  public readonly message: string;
-
-  public constructor(message: string, meta?: CallsiteMetadata) {
-    const metaText = meta !== undefined ? `[${meta?.line}:${meta?.character}]` : "";
-    this.message = tostring(metaText + message);
+  public constructor(
+    public readonly message: string,
+    public readonly meta?: CallsiteMetadata
+  ) {
     error(this.toString(), 0);
   }
 
@@ -39,7 +38,8 @@ class AssertionFailedException {
   }
 
   public toString(): string {
-    return `Test failed!\n${this.message}`;
+    const metaText = this.meta !== undefined ? `[${this.meta?.line}:${this.meta?.character}] ` : "";
+    return metaText + `Test failed!\n${this.message}`;
   }
 }
 
