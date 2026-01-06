@@ -77,11 +77,14 @@ class TestRunner {
       await this.runTestClass(TestClass, testClass);
 
     const elapsedTime = os.clock() * 1000 - start;
-    for (const [_, testClass] of this.testClasses)
-      if ("destroy" in testClass && typeIs(testClass.destroy, "function"))
-        testClass.destroy();
+    return new Promise(resolve => {
+      for (const [_, testClass] of this.testClasses)
+        if ("destroy" in testClass && typeIs(testClass.destroy, "function"))
+          testClass.destroy();
 
-    reporter(this.generateOutput(elapsedTime, colors));
+      reporter(this.generateOutput(elapsedTime, colors));
+      resolve();
+    });
   }
 
   private async runTestClass(TestClass: TestClassConstructor, testClass: TestClassInstance): Promise<void> {
