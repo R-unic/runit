@@ -39,8 +39,8 @@ export function Theory<T extends object, Args extends unknown[]>(ctor: T, proper
  */
 export function InlineData<T extends object, Args extends unknown[]>(...args: Args) {
   return (ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args) => void>) => {
-    if (Reflect.hasMetadata(ctor, Meta.Fact) || !Reflect.hasMetadata(ctor, Meta.Theory))
-      throw Errors.UnexpectedData;
+    // if (Reflect.hasMetadata(ctor, Meta.Fact) || !Reflect.hasMetadata(ctor, Meta.Theory))
+    //   throw Errors.UnexpectedData;
 
     const dataMeta = Reflect.getMetadata<unknown[][]>(ctor, Meta.TestData, propertyKey) ?? [];
     dataMeta.push(args);
