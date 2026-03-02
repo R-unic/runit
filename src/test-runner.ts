@@ -6,6 +6,7 @@ import Object from "@rbxts/object-utils";
 import repr from "@rbxts/repr";
 
 import { Meta } from "./common";
+import { Producer } from "./decorators";
 
 type TestClassInstance = Record<string, Callback>;
 type TestClassConstructor = Constructor<TestClassInstance>;
@@ -137,14 +138,25 @@ class TestRunner {
     }
 
     for (const theoryName of theoryNames) {
-      const testCases = Reflect.getMetadata<unknown[][]>(TestClass, Meta.TestData, theoryName);
-      if (testCases === undefined)
+      const testCases = Reflect.getMetadata<unknown[][]>(TestClass, Meta.Data, theoryName);
+      const computedTestCases = Reflect.getMetadata<Producer<object, unknown[]>[]>(TestClass, Meta.MemberData, theoryName);
+      if (!testCases && !computedTestCases)
         throw `No data was provided to Theory test "${theoryName}"`;
 
+
       const theory = testClass[theoryName];
-      for (const i of $range(testCases.size() - 1, 0, -1)) {
-        const args = testCases[i];
-        promises.push(runTestCase(theory, theoryName, args));
+      if (testCases) {
+        for (const i of $range(testCases.size() - 1, 0, -1)) {
+          const args = testCases[i];
+          promises.push(runTestCase(theory, theoryName, args));
+        }
+      }
+      if (computedTestCases) {
+        for (const i of $range(computedTestCases.size() - 1, 0, -1)) {
+          const producer = computedTestCases[i];
+          const args = producer(testClass);
+          promises.push(runTestCase(theory, theoryName, args));
+        }
       }
     }
 
