@@ -1,16 +1,31 @@
 import { Modding } from "@flamework/core";
 import { Range, type RangeJSON } from "@rbxts/range";
 import { endsWith, startsWith } from "@rbxts/string-utils";
+import TestRunner from "./test-runner";
 
 type ClassType<T = object, Args extends unknown[] = never[]> = {
   new(...args: Args): T;
-}
+};
 
-type CallsiteMetadata = Modding.CallerMany<"line" | "character">;
+type CallsiteMetadata = Modding.CallerMany<"line" | "character" | "text">;
 
 interface IsTypeMetadata<T> {
   readonly text: Modding.Generic<T, "text">;
   readonly callsiteMeta: CallsiteMetadata;
+}
+
+function isExpectedException(e: unknown, expectedException: string | ClassType | undefined) {
+  const eString = tostring(e);
+  if (expectedException === undefined)
+    return true;
+
+  if (!typeIs(expectedException, "string")) {
+    return e instanceof expectedException;
+  }
+
+  return startsWith(eString, expectedException)
+    || endsWith(eString, expectedException)
+    || eString.find(expectedException, undefined, true) !== undefined;
 }
 
 class AssertionFailedException {
@@ -28,75 +43,83 @@ class AssertionFailedException {
   public static multipleFailures(methodName: string, totalItems: number, errors: [number, string, string][], meta?: CallsiteMetadata): AssertionFailedException {
     const message = `Assert.${methodName}() failure: ${errors.size()} of ${totalItems} items in the collection did not pass\n` +
       errors
-        .map(([index, element, err]) =>
-          `${index}     ${element}\n` +
-          `${" ".rep(tostring(index).size())}     ${err.split("\n").map(line => " ".rep(tostring(index).size()) + line).join("\n")}`
-        )
+        .map(([index, element, err]) => {
+          const spaces = " ".rep(tostring(index).size());
+          const indented = err.split("\n").map(line => spaces + line).join("\n");
+          return `${index}     ${element}\n` + `${spaces}     ${indented}`;
+        })
         .join("\n");
 
     return new AssertionFailedException(message, meta);
   }
 
   public toString(): string {
-    const metaText = this.meta !== undefined ? `[${this.meta?.line}:${this.meta?.character}] ` : "";
-    return metaText + `Test failed!\n${this.message}`;
+    const message: string[] = [];
+    const { meta } = this;
+    if (meta) {
+      message.push(`[${meta.line}:${meta.character}] Test failed!`);
+      message.push(meta.text);
+      message.push(" ".rep(meta.character) + "^");
+    }
+
+    message.push(this.message);
+    return message.join("\n");
   }
 }
 
 class Assert {
   /** @metadata macro */
-  public static propertyEqual<T>(object: T, property: keyof T, expectedValue: unknown, meta?: CallsiteMetadata): void {
+  public static propertyEqual<T extends {}, K extends Exclude<keyof T, Symbol>, V extends T[K]>(object: T, property: K, expectedValue: V, meta?: CallsiteMetadata): asserts object is T & { [P in K]: V } {
     const value = object[property];
     if (value === expectedValue) return;
     throw new AssertionFailedException(`Expected object property "${tostring(property)}" to be ${expectedValue}, got ${value}`, meta);
   }
 
   /** @metadata macro */
-  public static hasProperty(object: object, property: string, meta?: CallsiteMetadata): void {
+  public static hasProperty<T extends {}, K extends string>(object: T, property: K, meta?: CallsiteMetadata): asserts object is T & { [P in K]: defined };
+  public static hasProperty<T extends {}, K extends Exclude<keyof T, Symbol>>(object: T, property: K, meta?: CallsiteMetadata): asserts object is T & { [P in K]: NonNullable<T[K]> } {
     if (property in object) return;
     throw new AssertionFailedException(`Expected object to have property "${property}"`, meta);
   }
 
   /** @metadata macro */
   public static async doesNotThrowAsync(method: () => Promise<void>, meta?: CallsiteMetadata): Promise<void> {
-    await method()
-      .catch(e => {
-        throw new AssertionFailedException(`Expected async method not to throw, threw:\n${e}`, meta);
-      });
+    try {
+      return await method();
+    } catch (e) {
+      throw new AssertionFailedException(`Expected async method not to throw, threw:\n${e}`, meta);
+    }
   }
 
-  public static throwsAsync(method: () => Promise<void>): void
-  public static throwsAsync(method: () => Promise<void>, expectedException: string): void
-  public static async throwsAsync(method: () => Promise<void>, expectedException?: string | ClassType): Promise<void> {
-    let exceptionThrown = false;
+  /** @metadata macro */
+  public static async throwsAsync(method: () => Promise<void>, expectedException?: string | ClassType, meta?: CallsiteMetadata): Promise<void> {
+    let correctExceptionThrown = false;
     let thrown: unknown = undefined;
 
     await method()
       .catch((e: unknown) => {
         thrown = e;
-        exceptionThrown = expectedException !== undefined && typeOf(expectedException) === "string"
-          ? typeOf(expectedException) === "string"
-            ? startsWith(tostring(e), expectedException as string) || endsWith(tostring(e), expectedException as string)
-            : e instanceof (expectedException as ClassType)
-          : true;
+        correctExceptionThrown = isExpectedException(e, expectedException);
       });
 
-    if (exceptionThrown) return;
-    throw new AssertionFailedException(`Expected async method to throw${expectedException !== undefined ? `\nExpected: ${tostring(expectedException)}\nActual: ${thrown}` : ""}`);
+    if (correctExceptionThrown) return;
+    throw new AssertionFailedException(
+      `Expected async method to throw${expectedException !== undefined ? `\nExpected: ${tostring(expectedException)}\nActual: ${thrown}` : ""}`,
+      meta
+    );
   }
 
   /** @metadata macro */
-  public static doesNotThrow(method: () => void, meta?: CallsiteMetadata): void {
+  public static doesNotThrow<R>(method: () => R, meta?: CallsiteMetadata): R {
     try {
-      method();
+      return method();
     } catch (e) {
       throw new AssertionFailedException(`Expected method not to throw, threw:\n${e}`, meta);
     }
   }
 
-  public static throws(method: () => void): void
-  public static throws(method: () => void, expectedException: string | ClassType): void
-  public static throws(method: () => void, expectedException?: string | ClassType): void {
+  /** @metadata macro */
+  public static throws(method: () => void, expectedException?: string | ClassType, meta?: CallsiteMetadata): void {
     let thrown: unknown;
 
     try {
@@ -104,60 +127,65 @@ class Assert {
     } catch (e) {
       thrown = e;
       if (expectedException !== undefined) {
-        if (typeOf(expectedException) === "string" ? startsWith(tostring(e), expectedException as string) || endsWith(tostring(e), expectedException as string) : e instanceof (expectedException as ClassType)) return;
+        if (isExpectedException(e, expectedException)) return;
       } else
         return;
     }
 
-    throw new AssertionFailedException(`Expected method to throw${expectedException !== undefined ? ' "' + tostring(expectedException) + `", threw "${thrown}"` : ""}`);
+    throw new AssertionFailedException(
+      `Expected method to throw${expectedException !== undefined ? ' "' + tostring(expectedException) + `", threw "${thrown}"` : ""}`,
+      meta
+    );
   }
 
   /** @metadata macro */
   public static all<T extends defined>(array: T[], predicate: (element: T, index: number) => void, meta?: CallsiteMetadata): void {
     const errors: [number, string, string][] = [];
+    let errorCount = 0;
     let index = 0;
 
     for (const element of array) {
       try {
         predicate(element, index);
       } catch (e) {
-        errors.push([index, tostring(element), tostring(e)]);
+        errorCount = errors.push([index, tostring(element), tostring(e)]);
       }
       index++;
     }
 
-    if (errors.size() > 0)
+    if (errorCount > 0)
       throw AssertionFailedException.multipleFailures("all", index, errors, meta);
   }
 
   /** @metadata macro */
   public static any<T extends defined>(array: T[], predicate: (element: T, index: number) => void, meta?: CallsiteMetadata): void {
     const errors: [number, string, string][] = [];
+    let errorCount = 0;
     let index = 0;
 
     for (const element of array) {
       try {
         predicate(element, index);
       } catch (e) {
-        errors.push([index, tostring(element), tostring(e)]);
+        errorCount = errors.push([index, tostring(element), tostring(e)]);
       }
       index++;
     }
 
-    if (errors.size() === array.size())
+    if (errorCount === index)
       throw AssertionFailedException.multipleFailures("any", index, errors, meta);
   }
 
   /** @metadata macro */
   public static doesNotContain<T extends defined>(element: T, array: T[], meta?: CallsiteMetadata): void {
     if (!array.includes(element)) return;
-    throw new AssertionFailedException(`Expected array to not contain element "${array}"`);
+    throw new AssertionFailedException(`Expected array to not contain element "${array}"`, meta);
   }
 
   /** @metadata macro */
-  public static contains<T extends defined>(expectedElement: T, array: T[], meta?: CallsiteMetadata): void
+  public static contains<T extends defined>(expectedElement: T, array: T[], meta?: CallsiteMetadata): void;
   /** @metadata macro */
-  public static contains<T extends defined>(array: T[], predicate: (element: T) => boolean, meta?: CallsiteMetadata): void
+  public static contains<T extends defined>(array: T[], predicate: (element: T) => boolean, meta?: CallsiteMetadata): void;
   /** @metadata macro */
   public static contains<T extends defined>(array: T[] | T, predicate: T[] | ((element: T) => boolean), meta?: CallsiteMetadata): void {
     if (typeOf(predicate) === "function") {
@@ -178,8 +206,8 @@ class Assert {
 
   /** @metadata macro */
   public static notEmpty(array: defined[], meta?: CallsiteMetadata): void {
-    if (array.size() > 0) return;
-    throw new AssertionFailedException("Expected array not to be empty", meta);
+    for (const _ of array) return;
+    throw new AssertionFailedException("Expected array to not be empty", meta);
   }
 
   /** @metadata macro */
@@ -204,23 +232,22 @@ class Assert {
 
   /** @metadata macro */
   public static startsWith(str: string, substring: string, meta?: CallsiteMetadata): void {
-    if (startsWith(str, substring)) return
+    if (startsWith(str, substring)) return;
     throw new AssertionFailedException(`Expected string "${str}" to start with substring "${substring}"`, meta);
   }
 
   /** @metadata macro */
   public static endsWith(str: string, substring: string, meta?: CallsiteMetadata): void {
-    if (endsWith(str, substring)) return
+    if (endsWith(str, substring)) return;
     throw new AssertionFailedException(`Expected string "${str}" to end with substring "${substring}"`, meta);
   }
 
-  public static inRange(number: number, range: RangeJSON): void
-  public static inRange(number: number, range: Range): void
-  public static inRange(number: number, minimum: number, maximum: number): void
+  public static inRange(number: number, range: RangeJSON): void;
+  public static inRange(number: number, range: Range): void;
+  public static inRange(number: number, minimum: number, maximum: number): void;
   public static inRange(number: number, minimum: number | Range | RangeJSON, maximum?: number): void {
-    const isNumber = (value: unknown): value is number => typeOf(minimum) === "number";
-    if (isNumber(minimum)) {
-      if (number >= (minimum as number) && number <= maximum!) return;
+    if (typeIs(minimum, "number")) {
+      if (number >= minimum && number <= maximum!) return;
       throw AssertionFailedException.equality(`${minimum}-${maximum}`, number);
     } else {
       const range = minimum instanceof Range ? minimum : Range.fromJSON(minimum);
@@ -234,15 +261,17 @@ class Assert {
     value: unknown,
     guard?: ((value: unknown) => value is Expected) | Modding.Generic<Expected, "guard">,
     meta?: IsTypeMetadata<Expected>
-  ): value is Expected {
+  ): asserts value is Expected {
     const matches = guard?.(value) ?? false;
-    if (matches) return true;
+    if (matches) return;
 
     throw new AssertionFailedException(`Type ${meta?.text ?? "???"} did not pass the provided type guard ${guard}`, meta?.callsiteMeta);
   }
 
   /** @metadata macro */
-  public static isCheckableType(value: unknown, expectedType: keyof CheckableTypes | ClassType, meta?: CallsiteMetadata): void {
+  public static isCheckableType<T>(value: unknown, expectedType: ClassType<T>, meta?: CallsiteMetadata): asserts value is T;
+  public static isCheckableType<K extends keyof CheckableTypes>(value: unknown, expectedType: K | ClassType, meta?: CallsiteMetadata): asserts value is CheckableTypes[K];
+  public static isCheckableType<K extends keyof CheckableTypes>(value: unknown, expectedType: K | ClassType, meta?: CallsiteMetadata): void {
     if (typeOf(expectedType) === "string") {
       const actualType = typeOf(value);
       if (actualType === expectedType) return;
@@ -298,9 +327,12 @@ class Assert {
   }
 
   /** @metadata macro */
-  public static custom(runner: (fail: ((message: string) => void) | ((expected: unknown, actual: unknown) => void)) => void, meta?: CallsiteMetadata): void {
+  public static custom(
+    runner: (fail: ((message: string) => void) | ((expected: unknown, actual: unknown) => void)) => void,
+    meta?: CallsiteMetadata
+  ): void {
     runner((message, actual) => {
-      throw AssertionFailedException.equality(message, actual, meta)
+      throw AssertionFailedException.equality(message, actual, meta);
     });
   }
 

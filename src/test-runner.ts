@@ -2,11 +2,10 @@ import { Reflect } from "@flamework/core";
 import { Constructor } from "@flamework/core/out/utility";
 import { getDescendantsOfType } from "@rbxts/instance-utility";
 import StringBuilder from "@rbxts/string-builder";
-import Object from "@rbxts/object-utils";
 import repr from "@rbxts/repr";
 
 import { Meta } from "./common";
-import { Producer } from "./decorators";
+import type { Producer } from "./decorators";
 
 type TestClassInstance = Record<string, Callback>;
 type TestClassConstructor = Constructor<TestClassInstance>;
@@ -46,6 +45,10 @@ function formatTime(ms: number): string {
   return math.round(figure) + unit;
 }
 
+function timeMS(): number {
+  return 1000 * os.clock();
+}
+
 class TestRunner {
   private readonly testClasses: [TestClassConstructor, TestClassInstance][] = [];
   private results = new Map<Constructor, Record<string, TestCaseResult[]>>;
@@ -72,20 +75,20 @@ class TestRunner {
       return orderA < orderB;
     });
 
-    const { reporter, colors }: TestRunOptions = Object.assign({}, DEFAULT_TEST_RUN_OPTIONS, options);
-    const start = os.clock() * 1000;
+    const { reporter, colors }: TestRunOptions = { ...DEFAULT_TEST_RUN_OPTIONS, ...options };
+    const start = timeMS();
+    const promises: Promise<void>[] = [];
     for (const [TestClass, testClass] of this.testClasses)
-      await this.runTestClass(TestClass, testClass);
+      promises.push(this.runTestClass(TestClass, testClass));
 
-    const elapsedTime = os.clock() * 1000 - start;
-    return new Promise(resolve => {
-      for (const [_, testClass] of this.testClasses)
-        if ("destroy" in testClass && typeIs(testClass.destroy, "function"))
-          testClass.destroy();
+    await Promise.all(promises);
+    const elapsedTime = timeMS() - start;
 
-      reporter(this.generateOutput(elapsedTime, colors));
-      resolve();
-    });
+    for (const [_, testClass] of this.testClasses)
+      if ("destroy" in testClass && typeIs(testClass.destroy, "function"))
+        testClass.destroy();
+
+    reporter(this.generateOutput(elapsedTime, colors));
   }
 
   private async runTestClass(TestClass: TestClassConstructor, testClass: TestClassInstance): Promise<void> {
@@ -105,33 +108,30 @@ class TestRunner {
     };
     const fail = (exception: unknown, name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
       this.failedTests++;
-      addResult(name, {
-        errorMessage: tostring(exception),
-        timeElapsed,
-        inputs
-      });
+      const errorMessage = tostring(exception);
+      addResult(name, { errorMessage, timeElapsed, inputs });
     };
     const pass = (name: string, { timeElapsed, inputs }: Omit<TestCaseResult, "errorMessage">): void => {
       this.passedTests++;
-      addResult(name, {
-        timeElapsed,
-        inputs
-      });
+      addResult(name, { timeElapsed, inputs });
     };
-    const runTestCase = async (testCase: Callback, name: string, args?: unknown[]): Promise<boolean> => {
-      const start = os.clock() * 1000;
+    const runTestCase = async (testCase: Callback, name: string, inputs?: unknown[]): Promise<boolean> => {
+      const old = timeMS();
+      let recent: number;
       try {
-        await testCase(testClass, ...args ?? []);
+        await testCase(testClass, ...inputs ?? []);
+        recent = timeMS();
       } catch (e) {
-        fail(e, name, { timeElapsed: os.clock() * 1000 - start, inputs: args });
+        recent ??= timeMS();
+        fail(e, name, { timeElapsed: recent - old, inputs });
         return false;
       }
 
-      pass(name, { timeElapsed: os.clock() * 1000 - start, inputs: args });
+      pass(name, { timeElapsed: recent - old, inputs });
       return true;
     };
 
-    const promises: Promise<boolean>[] = []
+    const promises: Promise<boolean>[] = [];
     for (const factName of factNames) {
       const fact = testClass[factName];
       promises.push(runTestCase(fact, factName));
@@ -142,7 +142,6 @@ class TestRunner {
       const computedTestCases = Reflect.getMetadata<Producer<object, unknown[]>[]>(TestClass, Meta.MemberData, theoryName);
       if (!testCases && !computedTestCases)
         throw `No data was provided to Theory test "${theoryName}"`;
-
 
       const theory = testClass[theoryName];
       if (testCases) {
@@ -173,7 +172,7 @@ class TestRunner {
       : (passed ? "+" : "×");
 
     for (const [TestClass, testResultRecord] of pairs(this.results)) {
-      const testResults = Object.entries(testResultRecord);
+      const testResults = [...(testResultRecord as unknown as Map<string, TestCaseResult[]>)];
       const allPassed = testResults
         .every(([_, cases]) => cases.every(({ errorMessage }) => errorMessage === undefined));
       const totalTime = testResults.reduce(
