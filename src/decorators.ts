@@ -47,7 +47,7 @@ export function InlineData<T extends object, Args extends readonly unknown[]>(..
     dataMeta.push(args);
 
     Reflect.defineMetadata(ctor, Meta.Data, dataMeta, propertyKey);
-  }
+  };
 }
 
 export type Producer<T extends object, Args extends readonly unknown[]> = (ctor: T) => Args;
@@ -57,7 +57,7 @@ export type Producer<T extends object, Args extends readonly unknown[]> = (ctor:
  * The test data is provided as a function that computes a dataset for the test method.
  * The test method will be run once for each set of data generated from the function.
  */
-export function MemberData<T extends object, K extends ExtractKeys<T, (this: T) => readonly unknown[]>>(key: K) {
+export function ComputedData<T extends object, K extends ExtractKeys<T, (this: T) => readonly unknown[]>>(key: K) {
   type Args = ReturnType<T[K]> extends readonly unknown[] ? ReturnType<T[K]> : readonly unknown[];
   return (ctor: T, propertyKey: string, _: TypedPropertyDescriptor<(this: T, ...args: Args) => void>) => {
     if (Reflect.hasMetadata(ctor, Meta.Fact, propertyKey))
@@ -67,7 +67,7 @@ export function MemberData<T extends object, K extends ExtractKeys<T, (this: T) 
     dataMeta.push(ctor[key] as never);
 
     Reflect.defineMetadata(ctor, Meta.MemberData, dataMeta, propertyKey);
-  }
+  };
 }
 
 export function Order(order: number) {
